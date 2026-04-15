@@ -1,147 +1,91 @@
-# Pooyan 0.04
+# Pooyan 0.05
 
-**Languages:** فارسی | English | 中文 | Русский
+## پارسی
+Pooyan 0.05 نسخه‌ای است که منطق کامل اسکریپت داخل فایل `pooyan.sh` وصل شده است.
 
----
+### ویژگی‌ها
+- انتخاب زبان: پارسی / English / 中文 / Русский
+- حالت سریع Cloudflare Argo Quick Tunnel
+- نصب سرویس ماندگار
+- مدیریت سرویس با دستور `pooyan`
+- راهنمای نصب GitHub داخل منو
 
-## فارسی
-
-### معرفی
-**Pooyan 0.04** نسخه‌ای از بستهٔ پروژه است که اطلاعات نهایی GitHub را با ریپوی واقعی شما تنظیم می‌کند:
-- **GitHub User:** `PooyanGhorbani`
-- **Repository:** `Pooyan`
-- **Branch:** `main`
-- **Visibility:** `public`
-- **Repository URL:** `https://github.com/PooyanGhorbani/Pooyan`
-
-### وضعیت نصب آسان
-حالا که ریپو **public** شده، این دستور نصب یک‌خطی باید بعد از قرار گرفتن فایل `pooyan.sh` در ریشهٔ ریپو کار کند:
-
+### نصب سریع
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-### نصب دستی فعلی
-اگر هنوز فایل نهایی را به GitHub push نکرده‌ای، فعلاً این روش را استفاده کن:
-
+### اجرای دستی
 ```bash
 chmod +x pooyan.sh
 bash pooyan.sh
 ```
-
-### نصب یک‌خطی GitHub
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
-```
-
-### نکته
-این فایل هنوز **اسکلت رابط کاربری** است؛ یعنی پروژهٔ کامل هنوز داخل آن وصل نشده است.
 
 ---
 
 ## English
+Pooyan 0.05 includes the full project logic inside `pooyan.sh`.
 
-### Overview
-**Pooyan 0.04** is the project package version with your real GitHub repository details already configured:
-- **GitHub User:** `PooyanGhorbani`
-- **Repository:** `Pooyan`
-- **Branch:** `main`
-- **Visibility:** `public`
-- **Repository URL:** `https://github.com/PooyanGhorbani/Pooyan`
+### Features
+- Language selection: Persian / English / Chinese / Russian
+- Cloudflare Argo Quick Tunnel mode
+- Persistent service install mode
+- Service manager via `pooyan`
+- GitHub install info inside the menu
 
-### Easy install status
-Now that the repo is **public**, this one-line install command should work once `pooyan.sh` is pushed to the repo root:
-
+### Quick install
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-### Current manual install
-If the final file is not pushed to GitHub yet, use this manual method for now:
-
+### Manual run
 ```bash
 chmod +x pooyan.sh
 bash pooyan.sh
 ```
-
-### GitHub one-line install
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
-```
-
-### Note
-This file still contains the **interface scaffold only**; the full project logic is not connected yet.
 
 ---
 
 ## 中文
+Pooyan 0.05 已将完整项目逻辑接入 `pooyan.sh`。
 
-### 介绍
-**Pooyan 0.04** 已经写入你的真实 GitHub 仓库信息：
-- **GitHub 用户名：** `PooyanGhorbani`
-- **仓库名：** `Pooyan`
-- **分支：** `main`
-- **可见性：** `private`
-- **仓库地址：** `https://github.com/PooyanGhorbani/Pooyan`
+### 功能
+- 语言选择：پارسی / English / 中文 / Русский
+- Cloudflare Argo Quick Tunnel 快速模式
+- 可持久化安装服务模式
+- 使用 `pooyan` 管理服务
+- 菜单内置 GitHub 安装说明
 
-### 一键安装状态
-现在仓库已经是 **public**，只要把 `pooyan.sh` 放到仓库根目录，这个一键安装命令就应该可以使用：
-
+### 一键安装
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-### 当前手动安装方法
-如果最终文件还没有 push 到 GitHub，现在先用这个方式：
-
+### 手动运行
 ```bash
 chmod +x pooyan.sh
 bash pooyan.sh
 ```
-
-### GitHub 一键安装
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
-```
-
-### 说明
-当前文件仍然只是**界面骨架**，完整项目逻辑还没有接入。
 
 ---
 
 ## Русский
+В Pooyan 0.05 полная логика проекта уже подключена в `pooyan.sh`.
 
-### Описание
-**Pooyan 0.04** уже содержит реальные данные твоего GitHub-репозитория:
-- **GitHub User:** `PooyanGhorbani`
-- **Repository:** `Pooyan`
-- **Branch:** `main`
-- **Visibility:** `public`
-- **Repository URL:** `https://github.com/PooyanGhorbani/Pooyan`
+### Возможности
+- Выбор языка: پارسی / English / 中文 / Русский
+- Быстрый режим Cloudflare Argo Quick Tunnel
+- Установка сервиса с автозапуском
+- Управление сервисом через `pooyan`
+- Информация по установке GitHub в меню
 
-### Статус быстрой установки
-Теперь репозиторий **public**, и эта однострочная команда должна работать после загрузки `pooyan.sh` в корень репозитория:
-
+### Быстрая установка
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-### Текущая ручная установка
-Если финальный файл ещё не загружен в GitHub, пока используй этот способ:
-
+### Ручной запуск
 ```bash
 chmod +x pooyan.sh
 bash pooyan.sh
 ```
-
-### GitHub однострочная установка
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
-```
-
-### Примечание
-В текущем файле по-прежнему есть только **каркас интерфейса**; полная логика проекта ещё не подключена.
