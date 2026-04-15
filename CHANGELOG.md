@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.03
+## 0.04
 - Added final GitHub repo metadata: PooyanGhorbani/Pooyan
 - Marked repository visibility as private
 - Added install guidance for private vs public repository usage
