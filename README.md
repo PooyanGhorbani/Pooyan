@@ -1,4 +1,4 @@
-# Pooyan 0.01
+# Pooyan 0.02
 
 **Languages:** فارسی | English | 中文 | Русский
 
@@ -7,7 +7,7 @@
 ## فارسی
 
 ### معرفی
-**Pooyan 0.01** یک اسکریپت Bash برای راه‌اندازی و مدیریت خودکار Xray به‌همراه Cloudflare Tunnel است. این پروژه برای ساده‌سازی نصب، مدیریت سرویس، و تولید لینک‌های اتصال طراحی شده است.
+**Pooyan 0.02** یک اسکریپت Bash برای راه‌اندازی و مدیریت خودکار Xray به‌همراه Cloudflare Tunnel است. این پروژه برای ساده‌سازی نصب، مدیریت سرویس، و تولید لینک‌های اتصال طراحی شده است.
 
 ### قابلیت‌ها
 - پشتیبانی از چند زبان: **پارسی / English / 中文 / Русский**
@@ -77,7 +77,7 @@ chmod +x pooyan.sh
 ## English
 
 ### Overview
-**Pooyan 0.01** is a Bash script for automating Xray setup and management together with Cloudflare Tunnel. It is designed to simplify installation, service management, and connection link generation.
+**Pooyan 0.02** is a Bash script for automating Xray setup and management together with Cloudflare Tunnel. It is designed to simplify installation, service management, and connection link generation.
 
 ### Features
 - Multilingual interface: **Persian / English / 中文 / Русский**
@@ -147,7 +147,7 @@ This project is provided for educational, testing, and administrative purposes. 
 ## 中文
 
 ### 介绍
-**Pooyan 0.01** 是一个 Bash 脚本，用于自动化部署和管理 Xray 与 Cloudflare Tunnel。该项目旨在简化安装、服务管理以及连接链接生成。
+**Pooyan 0.02** 是一个 Bash 脚本，用于自动化部署和管理 Xray 与 Cloudflare Tunnel。该项目旨在简化安装、服务管理以及连接链接生成。
 
 ### 功能特点
 - 多语言界面：**پارسی / English / 中文 / Русский**
@@ -217,7 +217,7 @@ chmod +x pooyan.sh
 ## Русский
 
 ### Описание
-**Pooyan 0.01** — это Bash-скрипт для автоматической настройки и управления Xray вместе с Cloudflare Tunnel. Проект создан для упрощения установки, управления сервисом и генерации ссылок подключения.
+**Pooyan 0.02** — это Bash-скрипт для автоматической настройки и управления Xray вместе с Cloudflare Tunnel. Проект создан для упрощения установки, управления сервисом и генерации ссылок подключения.
 
 ### Возможности
 - Многоязычный интерфейс: **فارسی / English / 中文 / Русский**

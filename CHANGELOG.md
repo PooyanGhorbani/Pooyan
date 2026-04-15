@@ -1,7 +1,9 @@
 # Changelog
 
+## 0.02
+- Language menu changed from one line to a vertical list
+- Added a cleaner four-language interface flow
+- Replaced the old scaffold message with a simple multilingual main menu
+
 ## 0.01
-- Initial GitHub-ready project scaffold
-- Multilingual README added: فارسی / English / 中文 / Русский
-- Easy install section added to documentation
-- Base repo files added: LICENSE, .gitignore, SECURITY, CONTRIBUTING
+- Initial project scaffold
