@@ -1,0 +1,3 @@
+bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
+
+curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh -o pooyan.sh && chmod +x pooyan.sh && bash pooyan.sh
