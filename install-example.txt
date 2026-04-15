@@ -1,3 +1,6 @@
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
+# Private repository install (current)
+chmod +x pooyan.sh
+bash pooyan.sh
 
-curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh -o pooyan.sh && chmod +x pooyan.sh && bash pooyan.sh
+# Public raw install (works only if the repo becomes public)
+bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)

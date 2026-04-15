@@ -2,8 +2,15 @@
 set -euo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.02"
+PROJECT_VERSION="0.03"
 APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
+
+GITHUB_USER="PooyanGhorbani"
+GITHUB_REPO="Pooyan"
+GITHUB_BRANCH="main"
+GITHUB_VISIBILITY="private"
+GITHUB_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}"
+RAW_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/pooyan.sh"
 
 choose_language() {
   clear
@@ -26,78 +33,117 @@ choose_language() {
   esac
 }
 
+repo_info() {
+  echo "GitHub: ${GITHUB_URL}"
+  echo "Repo: ${GITHUB_USER}/${GITHUB_REPO}"
+  echo "Branch: ${GITHUB_BRANCH}"
+  echo "Visibility: ${GITHUB_VISIBILITY}"
+}
+
+public_install_hint() {
+  echo "bash <(curl -fsSL ${RAW_URL})"
+}
+
+private_install_hint() {
+  cat <<'EOF'
+1) Upload pooyan.sh to your server manually
+2) chmod +x pooyan.sh
+3) bash pooyan.sh
+EOF
+}
+
 t() {
   local key="$1"
   case "$LANG_CODE" in
     fa)
       case "$key" in
         welcome) echo "به ${APP_TITLE} خوش آمدید" ;;
-        subtitle) echo "رابط چهارزبانه پروژه آماده است." ;;
-        note) echo "منطق نهایی پروژه را در بخش‌های مربوطه اضافه کنید." ;;
+        subtitle) echo "اطلاعات نهایی مخزن GitHub در این نسخه تنظیم شده است." ;;
+        repo_note) echo "این ریپو private است؛ نصب مستقیم با raw GitHub برای عموم کار نمی‌کند." ;;
+        repo_tip) echo "برای نصب یک‌خطی باید ریپو public شود یا یک installer عمومی جدا بسازی." ;;
         menu_title) echo "منوی اصلی" ;;
         quick) echo "1. حالت سریع" ;;
         install) echo "2. نصب سرویس" ;;
         uninstall) echo "3. حذف سرویس" ;;
         cache) echo "4. پاک کردن کش" ;;
         manage) echo "5. مدیریت سرویس" ;;
+        repo_menu) echo "6. اطلاعات GitHub و نصب" ;;
         exit) echo "0. خروج" ;;
         prompt) echo "حالت را انتخاب کنید [0]: " ;;
         selected) echo "گزینه انتخاب‌شده:" ;;
-        placeholder) echo "در این پکیج فقط رابط آماده شده است. منطق نهایی را خودت به این بخش وصل کن." ;;
+        placeholder) echo "در این بسته هنوز فقط رابط آماده است و منطق نهایی اصلی داخل آن قرار نگرفته است." ;;
+        install_title) echo "راهنمای نصب" ;;
+        install_private) echo "روش فعلی برای ریپوی private:" ;;
+        install_public) echo "اگر بعداً ریپو را public کردی، دستور نصب یک‌خطی این است:" ;;
         bye) echo "خروج با موفقیت انجام شد." ;;
         invalid) echo "گزینه نامعتبر است." ;;
       esac ;;
     en)
       case "$key" in
         welcome) echo "Welcome to ${APP_TITLE}" ;;
-        subtitle) echo "The multilingual interface is ready." ;;
-        note) echo "Add your final project logic in the relevant sections." ;;
+        subtitle) echo "The final GitHub repository details are configured in this build." ;;
+        repo_note) echo "This repository is private, so direct public raw GitHub install will not work." ;;
+        repo_tip) echo "For one-line install, make the repo public or create a separate public installer repo." ;;
         menu_title) echo "Main Menu" ;;
         quick) echo "1. Quick Mode" ;;
         install) echo "2. Install Service" ;;
         uninstall) echo "3. Uninstall Service" ;;
         cache) echo "4. Clear Cache" ;;
         manage) echo "5. Manage Service" ;;
+        repo_menu) echo "6. GitHub Info & Install" ;;
         exit) echo "0. Exit" ;;
         prompt) echo "Choose mode [0]: " ;;
         selected) echo "Selected option:" ;;
-        placeholder) echo "This package currently includes the interface scaffold only. Plug your final logic into this section." ;;
+        placeholder) echo "This package still contains the interface scaffold only; the final core logic is not embedded yet." ;;
+        install_title) echo "Install Guide" ;;
+        install_private) echo "Current method for the private repository:" ;;
+        install_public) echo "If you later make the repo public, the one-line installer will be:" ;;
         bye) echo "Exited successfully." ;;
         invalid) echo "Invalid option." ;;
       esac ;;
     zh)
       case "$key" in
         welcome) echo "欢迎使用 ${APP_TITLE}" ;;
-        subtitle) echo "四语言界面已准备完成。" ;;
-        note) echo "请在对应位置加入你的最终项目逻辑。" ;;
+        subtitle) echo "此版本已经写入最终 GitHub 仓库信息。" ;;
+        repo_note) echo "当前仓库是 private，因此公共 raw GitHub 一键安装不能直接使用。" ;;
+        repo_tip) echo "如果你想要一键安装，请把仓库设为 public，或者单独创建一个 public 安装仓库。" ;;
         menu_title) echo "主菜单" ;;
         quick) echo "1. 快速模式" ;;
         install) echo "2. 安装服务" ;;
         uninstall) echo "3. 卸载服务" ;;
         cache) echo "4. 清理缓存" ;;
         manage) echo "5. 管理服务" ;;
+        repo_menu) echo "6. GitHub 信息与安装" ;;
         exit) echo "0. 退出" ;;
         prompt) echo "请选择模式 [0]: " ;;
         selected) echo "已选择：" ;;
-        placeholder) echo "此压缩包当前仅包含界面骨架，请在这里接入你的最终逻辑。" ;;
+        placeholder) echo "当前压缩包仍然只包含界面骨架，最终核心逻辑尚未嵌入。" ;;
+        install_title) echo "安装说明" ;;
+        install_private) echo "当前 private 仓库的使用方式：" ;;
+        install_public) echo "如果以后把仓库改成 public，一键安装命令将是：" ;;
         bye) echo "已成功退出。" ;;
         invalid) echo "选项无效。" ;;
       esac ;;
     ru)
       case "$key" in
         welcome) echo "Добро пожаловать в ${APP_TITLE}" ;;
-        subtitle) echo "Четырёхъязычный интерфейс готов." ;;
-        note) echo "Добавьте финальную логику проекта в соответствующие разделы." ;;
+        subtitle) echo "В этой версии уже прописаны финальные данные GitHub-репозитория." ;;
+        repo_note) echo "Этот репозиторий private, поэтому публичная установка через raw GitHub сейчас не работает." ;;
+        repo_tip) echo "Для однострочной установки сделайте репозиторий public или создайте отдельный public-репозиторий для установщика." ;;
         menu_title) echo "Главное меню" ;;
         quick) echo "1. Быстрый режим" ;;
         install) echo "2. Установить сервис" ;;
         uninstall) echo "3. Удалить сервис" ;;
         cache) echo "4. Очистить кэш" ;;
         manage) echo "5. Управление сервисом" ;;
+        repo_menu) echo "6. GitHub и установка" ;;
         exit) echo "0. Выход" ;;
         prompt) echo "Выберите режим [0]: " ;;
         selected) echo "Выбрано:" ;;
-        placeholder) echo "Сейчас в пакете только интерфейс. Подключите сюда финальную логику проекта." ;;
+        placeholder) echo "В этом пакете пока только интерфейс; финальная основная логика ещё не встроена." ;;
+        install_title) echo "Инструкция по установке" ;;
+        install_private) echo "Текущий способ для private-репозитория:" ;;
+        install_public) echo "Если позже сделать репозиторий public, команда однострочной установки будет такой:" ;;
         bye) echo "Выход выполнен успешно." ;;
         invalid) echo "Неверный пункт меню." ;;
       esac ;;
@@ -116,7 +162,10 @@ main_menu_ui() {
   banner
   echo "$(t welcome)"
   echo "$(t subtitle)"
-  echo "$(t note)"
+  echo "$(t repo_note)"
+  echo "$(t repo_tip)"
+  echo
+  repo_info
   echo
   echo "$(t menu_title)"
   echo "$(t quick)"
@@ -124,7 +173,21 @@ main_menu_ui() {
   echo "$(t uninstall)"
   echo "$(t cache)"
   echo "$(t manage)"
+  echo "$(t repo_menu)"
   echo "$(t exit)"
+  echo
+}
+
+show_install_info() {
+  echo
+  echo "$(t install_title)"
+  repo_info
+  echo
+  echo "$(t install_private)"
+  private_install_hint
+  echo
+  echo "$(t install_public)"
+  public_install_hint
   echo
 }
 
@@ -137,6 +200,9 @@ main() {
   case "$mode" in
     0)
       echo "$(t bye)"
+      ;;
+    6)
+      show_install_info
       ;;
     1|2|3|4|5)
       echo

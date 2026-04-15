@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.02
-- Language menu changed from one line to a vertical list
-- Added a cleaner four-language interface flow
-- Replaced the old scaffold message with a simple multilingual main menu
+## 0.03
+- Added final GitHub repo metadata: PooyanGhorbani/Pooyan
+- Marked repository visibility as private
+- Added install guidance for private vs public repository usage
+- Added GitHub info/install section to the multilingual menu
 
-## 0.01
-- Initial project scaffold
+## 0.02
+- Added vertical language menu
+- Added Russian language option
+- Removed placeholder scaffold message from the first screen
