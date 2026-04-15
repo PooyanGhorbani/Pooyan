@@ -1,6 +1,6 @@
 # Pooyan 0.06
 
-Updated terminal-safe Persian layout for PuTTY.
+
 
 Install:
 ```bash
