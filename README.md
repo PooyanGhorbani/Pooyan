@@ -1,63 +1,46 @@
-# Pooyan 0.12
+# Pooyan 0.13 - China Stable
 
-China-focused Xray installer with a safer Quick Mode.
-
-## Install
+Install:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-## Recommended for China
+Then choose option `1`.
 
-Choose option **1** first:
+## What changed in 0.13
 
-```text
-Quick Mode - Direct IP first + Auto trycloudflare.com
-```
+This version restores the old stable style:
 
-This mode now creates the Direct IP link first, installs the `pooyan` manager command, and then tries to create a temporary `trycloudflare.com` link.
-
-## Important v2rayN note
-
-Do not paste VLESS links into the Linux shell. The `&` characters inside VLESS links are shell control characters.
-
-Use one of these files instead:
+- VLESS + WebSocket
+- Auto `trycloudflare.com` Quick Tunnel
+- Old China-style Cloudflare front domain links using `cloudflare.182682.xyz`
+- Official Cloudflare HTTP ports: `80, 8080, 8880, 2052, 2082, 2086, 2095`
+- Official Cloudflare HTTPS ports: `443, 2053, 2083, 2087, 2096, 8443`
+- Direct IP link without domain and without TLS
+- `pooyan` command is installed automatically
+- Clean v2rayN import file is generated at:
 
 ```bash
-cat /root/v2ray.txt
-cat /root/pooyan-v2rayn-import.txt
-```
-
-For the cleanest v2rayN import, download this file with WinSCP or another SFTP client:
-
-```text
 /root/pooyan-v2rayn-import.txt
 ```
 
-## Manager
+Do not paste VLESS links into the Linux shell because `&` breaks the URL. Import from the file above.
 
-After installation, run:
+## Commands
 
 ```bash
 pooyan
+pooyan quick
+pooyan links
+pooyan status
+pooyan logs
 ```
 
-The manager can show links, logs, restart services, and uninstall Pooyan.
-
-## Files
+## Important files
 
 ```text
-/opt/pooyan/config.json
-/opt/pooyan/v2ray.txt
 /root/v2ray.txt
 /root/pooyan-v2rayn-import.txt
-/root/pooyan-sub-base64.txt
-/usr/bin/pooyan
+/root/pooyan-sub.txt
 ```
-
-## Modes
-
-1. **Quick Mode** — Direct IP first, then trycloudflare.com if Cloudflare is reachable.
-2. **Custom Domain** — Cloudflare Tunnel with your own domain.
-3. **Advanced Reality** — VLESS + REALITY + Vision direct mode for good CN2/CMI/AS9929 VPS routes.

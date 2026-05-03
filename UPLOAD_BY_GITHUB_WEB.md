@@ -1,24 +1,27 @@
-# Upload by GitHub Web
+# Upload to GitHub by Web
 
-Keep only these files in the repository root:
+Keep only these files in the root of the repo:
+
+```text
+pooyan.sh
+README.md
+CHANGELOG.md
+VERSION
+LICENSE
+```
+
+Replace these files:
 
 - `pooyan.sh`
 - `README.md`
 - `CHANGELOG.md`
 - `VERSION`
-- `LICENSE`
 
-Replace the content of the existing files with the new files from this package.
+Delete old version-named files from the root, such as:
 
-Delete old version-named files such as:
-
-- `pooyan_0.07.sh`
-- `README_Pooyan_0.07.md`
-- `CHANGELOG_Pooyan_0.07.md`
-- `upload_commands_pooyan_0.07.txt`
-
-After uploading, install with:
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
+```text
+pooyan_0.07.sh
+README_Pooyan_0.07.md
+CHANGELOG_Pooyan_0.07.md
+upload_commands_pooyan_0.07.txt
 ```

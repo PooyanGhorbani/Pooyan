@@ -2,802 +2,402 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.12"
-APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
+PROJECT_VERSION="0.13"
+APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION} - China Stable"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
-XRAY_BIN="${APP_DIR}/xray"
-CLOUDFLARED_BIN="${APP_DIR}/cloudflared"
-LINK_FILE="${APP_DIR}/v2ray.txt"
-ROOT_LINK_FILE="/root/v2ray.txt"
+RAW_URL="https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh"
 
-CF_DEFAULT_ADDRESS="cloudflare.182682.xyz"
-CF_HTTPS_PORTS="443 2053 2083 2087 2096 8443"
-CF_HTTP_PORTS="80 8080 8880 2052 2082 2086 2095"
+XRAY_CONFIG="/usr/local/etc/xray/config.json"
+XRAY_BIN="/usr/local/bin/xray"
+CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+LINK_FILE="/root/v2ray.txt"
+IMPORT_FILE="/root/pooyan-v2rayn-import.txt"
+SUB_FILE="/root/pooyan-sub.txt"
+STATE_FILE="${APP_DIR}/state.env"
+ARGO_LOG="/tmp/pooyan-argo.log"
+ARGO_PID="${APP_DIR}/cloudflared.pid"
 
-red(){ printf '\033[31m%s\033[0m\n' "$*"; }
-green(){ printf '\033[32m%s\033[0m\n' "$*"; }
-yellow(){ printf '\033[33m%s\033[0m\n' "$*"; }
-blue(){ printf '\033[36m%s\033[0m\n' "$*"; }
-line(){ printf '%*s\n' 54 '' | tr ' ' '='; }
+DEFAULT_CF_DOMAIN="cloudflare.182682.xyz"
+HTTP_PORTS=(80 8080 8880 2052 2082 2086 2095)
+HTTPS_PORTS=(443 2053 2083 2087 2096 8443)
 
-need_root(){
-  if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    red "Please run as root. / 请使用 root 运行 / لطفاً با root اجرا کن."
-    exit 1
-  fi
-}
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+cyan() { printf '\033[36m%s\033[0m\n' "$*"; }
 
-pause(){ read -r -p "Press Enter to continue..." _ || true; }
+pause() { echo; read -r -p "Press Enter / اینتر بزن..." _ || true; }
+need_root() { [ "${EUID:-$(id -u)}" -eq 0 ] || { red "Run as root."; exit 1; }; }
 
-banner(){
+banner() {
   clear || true
-  line
-  printf "%28s\n" "${APP_TITLE}"
-  printf "%38s\n" "Quick Stable + Manager Fix Edition"
-  line
-  echo
+  echo "============================================================"
+  printf "%33s\n" "${APP_TITLE}"
+  echo "============================================================"
 }
 
-get_os_family(){
-  if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    case "${ID:-}" in
-      debian|ubuntu) echo "debian" ;;
-      centos|rhel|rocky|almalinux|fedora) echo "rhel" ;;
-      alpine) echo "alpine" ;;
-      *)
-        case "${ID_LIKE:-}" in
-          *debian*) echo "debian" ;;
-          *rhel*|*fedora*) echo "rhel" ;;
-          *) echo "unknown" ;;
-        esac
-        ;;
-    esac
+os_id() { . /etc/os-release 2>/dev/null || true; echo "${ID:-linux}"; }
+install_pkgs() {
+  local os; os="$(os_id)"
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y || true
+    apt-get install -y curl wget unzip tar ca-certificates openssl procps iproute2 lsof || true
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof || true
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof || true
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache curl wget unzip tar ca-certificates openssl procps iproute2 lsof || true
   else
-    echo "unknown"
+    yellow "Unknown package manager. Continuing..."
   fi
 }
 
-pkg_install(){
-  local family="$1"; shift
-  case "$family" in
-    debian)
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update -y
-      apt-get install -y "$@"
-      ;;
-    rhel)
-      if command -v dnf >/dev/null 2>&1; then
-        dnf install -y "$@"
-      else
-        yum install -y "$@"
-      fi
-      ;;
-    alpine)
-      apk update
-      apk add --no-cache "$@"
-      ;;
-    *)
-      red "Unsupported OS. Please use Debian 12/Ubuntu 22.04+ for best result."
-      exit 1
-      ;;
-  esac
+random_port() {
+  local p
+  p=$((20000 + ($(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 25000)))
+  echo "$p"
 }
 
-ensure_deps(){
-  local family
-  family="$(get_os_family)"
-  local missing=()
-  for cmd in curl unzip openssl; do
-    command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
-  done
-  if [ "${#missing[@]}" -gt 0 ]; then
-    yellow "Installing dependencies: ${missing[*]}"
-    case "$family" in
-      debian) pkg_install "$family" curl unzip openssl ca-certificates ;;
-      rhel) pkg_install "$family" curl unzip openssl ca-certificates ;;
-      alpine) pkg_install "$family" curl unzip openssl ca-certificates bash ;;
-      *) pkg_install "$family" "${missing[@]}" ;;
-    esac
-  fi
-}
-
-detect_arch(){
-  case "$(uname -m)" in
-    x86_64|amd64) echo "amd64" ;;
-    aarch64|arm64|armv8*) echo "arm64" ;;
-    i386|i686) echo "386" ;;
-    armv7l|armv7*) echo "armv7" ;;
-    *) red "Unsupported architecture: $(uname -m)"; exit 1 ;;
-  esac
-}
-
-xray_url(){
-  case "$(detect_arch)" in
-    amd64) echo "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" ;;
-    386) echo "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-32.zip" ;;
-    arm64) echo "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-arm64-v8a.zip" ;;
-    armv7) echo "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-arm32-v7a.zip" ;;
-  esac
-}
-
-cloudflared_url(){
-  case "$(detect_arch)" in
-    amd64) echo "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" ;;
-    386) echo "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386" ;;
-    arm64) echo "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64" ;;
-    armv7) echo "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm" ;;
-  esac
-}
-
-install_binaries(){
-  mkdir -p "$APP_DIR"
-  local tmp
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
-
-  if [ ! -x "$XRAY_BIN" ]; then
-    yellow "Downloading latest Xray-core..."
-    curl -fL --retry 3 "$(xray_url)" -o "$tmp/xray.zip"
-    unzip -o "$tmp/xray.zip" -d "$tmp/xray" >/dev/null
-    install -m 0755 "$tmp/xray/xray" "$XRAY_BIN"
-  fi
-
-  if [ ! -x "$CLOUDFLARED_BIN" ]; then
-    yellow "Downloading latest cloudflared..."
-    curl -fL --retry 3 "$(cloudflared_url)" -o "$CLOUDFLARED_BIN"
-    chmod +x "$CLOUDFLARED_BIN"
-  fi
-}
-
-random_uuid(){
-  if [ -r /proc/sys/kernel/random/uuid ]; then
+new_uuid() {
+  if command -v xray >/dev/null 2>&1; then
+    xray uuid 2>/dev/null | head -n1 || cat /proc/sys/kernel/random/uuid
+  else
     cat /proc/sys/kernel/random/uuid
-  else
-    openssl rand -hex 16 | sed 's/^\(.\{8\}\)\(.\{4\}\)\(.\{4\}\)\(.\{4\}\)\(.\{12\}\)$/\1-\2-\3-\4-\5/'
   fi
 }
 
-random_path(){
-  openssl rand -hex 8
+public_ip() {
+  curl -4 -fsS --max-time 8 https://api.ipify.org 2>/dev/null \
+  || curl -4 -fsS --max-time 8 https://ifconfig.me 2>/dev/null \
+  || curl -4 -fsS --max-time 8 https://icanhazip.com 2>/dev/null \
+  || hostname -I 2>/dev/null | awk '{print $1}'
 }
 
-random_port(){
-  echo $((20000 + RANDOM % 30000))
-}
-
-public_ip(){
-  curl -4fsS --max-time 6 https://api.ipify.org 2>/dev/null \
-    || curl -4fsS --max-time 6 https://ifconfig.me 2>/dev/null \
-    || curl -4fsS --max-time 6 https://icanhazip.com 2>/dev/null \
-    || hostname -I 2>/dev/null | awk '{print $1}' \
-    || echo "YOUR_SERVER_IP"
-}
-
-url_encode_label(){
-  printf '%s' "$1" | sed -e 's/ /%20/g' -e 's/,/%2C/g' -e 's/#/%23/g' -e 's/:/%3A/g'
-}
-
-enable_bbr(){
-  yellow "Trying to enable BBR..."
-  modprobe tcp_bbr >/dev/null 2>&1 || true
-  cat > /etc/sysctl.d/99-pooyan-bbr.conf <<'BBR'
-net.core.default_qdisc=fq
-net.ipv4.tcp_congestion_control=bbr
-BBR
-  sysctl --system >/dev/null 2>&1 || sysctl -p /etc/sysctl.d/99-pooyan-bbr.conf >/dev/null 2>&1 || true
-  local current
-  current="$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || true)"
-  if [ "$current" = "bbr" ]; then
-    green "BBR: enabled"
-  else
-    yellow "BBR was requested, but kernel reports: ${current:-unknown}"
-  fi
-}
-
-write_systemd_service(){
-  local name="$1" exec_cmd="$2" desc="$3"
-  cat > "/etc/systemd/system/${name}.service" <<EOF_SERVICE
-[Unit]
-Description=${desc}
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=${exec_cmd}
-Restart=always
-RestartSec=3
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-EOF_SERVICE
-}
-
-reload_systemd(){
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload
-  fi
-}
-
-start_enable_service(){
-  local svc="$1"
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable "$svc" >/dev/null 2>&1 || true
-    systemctl restart "$svc" || true
-  fi
-}
-
-stop_disable_service(){
-  local svc="$1"
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl stop "$svc" >/dev/null 2>&1 || true
-    systemctl disable "$svc" >/dev/null 2>&1 || true
-  fi
-}
-
-ask_default(){
-  local prompt="$1" default="$2" value
-  read -r -p "$prompt [$default]: " value || true
-  printf '%s' "${value:-$default}"
-}
-
-validate_domain(){
-  printf '%s' "$1" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$'
-}
-
-
-xray_check_config(){
-  local config="$1"
-  # Newer Xray-core uses: xray run -test -config file
-  if "$XRAY_BIN" run -test -config "$config" >/tmp/pooyan-xray-test.log 2>&1; then
-    return 0
-  fi
-  # Compatibility fallback for older builds/wrappers
-  if "$XRAY_BIN" test -config "$config" >/tmp/pooyan-xray-test.log 2>&1; then
-    return 0
-  fi
-  red "Xray config test failed. Last output:"
-  cat /tmp/pooyan-xray-test.log 2>/dev/null || true
-  exit 1
-}
-
-make_vless_ws_config(){
-  local uuid="$1" port="$2" path="$3" listen_addr="${4:-127.0.0.1}"
-  cat > "${APP_DIR}/config.json" <<EOF_JSON
-{
-  "log": {
-    "loglevel": "warning"
-  },
-  "inbounds": [
-    {
-      "listen": "${listen_addr}",
-      "port": ${port},
-      "protocol": "vless",
-      "settings": {
-        "clients": [
-          {
-            "id": "${uuid}",
-            "level": 0
-          }
-        ],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-          "path": "/${path}"
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "protocol": "freedom",
-      "tag": "direct"
-    }
-  ]
-}
-EOF_JSON
-}
-
-write_ws_links(){
-  local uuid="$1" domain="$2" path="$3" label_prefix="$4"
+install_self_manager() {
   mkdir -p "$APP_DIR"
-  : > "$LINK_FILE"
-  {
-    echo "Pooyan ${PROJECT_VERSION} - VLESS WS Cloudflare / Auto Domain"
-    echo "UUID: ${uuid}"
-    echo "Host/SNI: ${domain}"
-    echo "WS Path: /${path}"
-    echo
-    echo "Standard links - address is your Cloudflare domain:"
-    for p in $CF_HTTPS_PORTS; do
-      echo "vless://${uuid}@${domain}:${p}?encryption=none&security=tls&type=ws&host=${domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-TLS-${p}")"
-    done
-    echo
-    for p in $CF_HTTP_PORTS; do
-      echo "vless://${uuid}@${domain}:${p}?encryption=none&security=none&type=ws&host=${domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-HTTP-${p}")"
-    done
-    echo
-    echo "CF Preferred IP style - replace ${CF_DEFAULT_ADDRESS} with a faster Cloudflare preferred IP/domain if you test one:"
-    for p in $CF_HTTPS_PORTS; do
-      echo "vless://${uuid}@${CF_DEFAULT_ADDRESS}:${p}?encryption=none&security=tls&type=ws&host=${domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-CFIP-TLS-${p}")"
-    done
-    echo
-    echo "Tip: For China, test 443, 2053, 2083, 8443 first. Keep the fastest stable one."
-  } >> "$LINK_FILE"
-  cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
+  if [ -r "${0:-}" ]; then
+    cp "${0}" "${APP_DIR}/pooyan.sh" 2>/dev/null || true
+  fi
+  if [ ! -s "${APP_DIR}/pooyan.sh" ]; then
+    curl -fsSL "$RAW_URL" -o "${APP_DIR}/pooyan.sh" || true
+  fi
+  chmod +x "${APP_DIR}/pooyan.sh" 2>/dev/null || true
+  cat > "$APP_CMD" <<'EOS'
+#!/usr/bin/env bash
+exec bash /opt/pooyan/pooyan.sh "$@"
+EOS
+  chmod +x "$APP_CMD"
 }
 
+install_xray() {
+  if command -v xray >/dev/null 2>&1 && [ -x "$(command -v xray)" ]; then
+    XRAY_BIN="$(command -v xray)"
+    return 0
+  fi
+  cyan "Installing Xray..."
+  bash -c "$(curl -LfsS https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install || {
+    red "Xray install failed. Check VPS network/GitHub access."
+    exit 1
+  }
+  command -v xray >/dev/null 2>&1 && XRAY_BIN="$(command -v xray)"
+}
 
-open_firewall_port_best_effort(){
+install_cloudflared() {
+  if command -v cloudflared >/dev/null 2>&1; then
+    CLOUDFLARED_BIN="$(command -v cloudflared)"
+    return 0
+  fi
+  cyan "Installing cloudflared..."
+  local arch url
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    armv7l|armv6l) arch="arm" ;;
+    *) red "Unsupported arch for cloudflared: $(uname -m)"; exit 1 ;;
+  esac
+  url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}"
+  curl -LfsS "$url" -o "$CLOUDFLARED_BIN" || {
+    red "cloudflared download failed. Check VPS network/GitHub access."
+    exit 1
+  }
+  chmod +x "$CLOUDFLARED_BIN"
+}
+
+open_firewall_port() {
   local port="$1"
-  yellow "Trying to open TCP port ${port} locally if a firewall is active..."
+  yellow "Trying to open TCP port ${port} locally if firewall is active..."
   if command -v ufw >/dev/null 2>&1; then
     ufw allow "${port}/tcp" >/dev/null 2>&1 || true
   fi
-  if command -v firewall-cmd >/dev/null 2>&1; then
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
     firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
     firewall-cmd --reload >/dev/null 2>&1 || true
   fi
   if command -v iptables >/dev/null 2>&1; then
-    iptables -C INPUT -p tcp --dport "${port}" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT >/dev/null 2>&1 || true
+    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || true
   fi
 }
 
-append_direct_ip_links(){
-  local uuid="$1" server_ip="$2" port="$3" path="$4" label_prefix="$5"
-  {
-    echo
-    echo "Direct IP link - NO domain / بدون دامنه"
-    echo "Use this only for quick speed test. It is faster/simple, but usually less stable for China than Cloudflare/Reality."
-    echo "If it cannot connect, open TCP port ${port} in the VPS provider security group/firewall."
-    echo "vless://${uuid}@${server_ip}:${port}?encryption=none&security=none&type=ws&path=%2F${path}#$(url_encode_label "${label_prefix}-DIRECT-IP-${port}")"
-  } >> "$LINK_FILE"
-  cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
-}
-
-write_quick_links(){
-  local uuid="$1" server_ip="$2" port="$3" path="$4" argo_domain="${5:-}" label_prefix="$6"
-  mkdir -p "$APP_DIR"
-  : > "$LINK_FILE"
-  {
-    echo "Pooyan ${PROJECT_VERSION} - Quick Stable Links"
-    echo "UUID: ${uuid}"
-    echo "Server IP: ${server_ip}"
-    echo "Local/Public Port: ${port}"
-    echo "WS Path: /${path}"
-    echo
-    echo "IMPORTANT / مهم:"
-    echo "Copy links from /root/v2ray.txt or download the file with WinSCP. Do not paste VLESS links into the Linux shell."
-    echo
-    echo "Direct IP link - NO domain / بدون دامنه"
-    echo "vless://${uuid}@${server_ip}:${port}?encryption=none&security=none&type=ws&path=%2F${path}#$(url_encode_label "${label_prefix}-DIRECT-IP-${port}")"
-  } >> "$LINK_FILE"
-
-  if [ -n "$argo_domain" ]; then
-    {
-      echo
-      echo "Auto trycloudflare.com links / لینک خودکار بدون دامنه شخصی"
-      echo "vless://${uuid}@${argo_domain}:443?encryption=none&security=tls&type=ws&host=${argo_domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-ARGO-TLS-443")"
-      echo "vless://${uuid}@${argo_domain}:2053?encryption=none&security=tls&type=ws&host=${argo_domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-ARGO-TLS-2053")"
-      echo "vless://${uuid}@${argo_domain}:80?encryption=none&security=none&type=ws&host=${argo_domain}&path=%2F${path}#$(url_encode_label "${label_prefix}-ARGO-HTTP-80")"
-      echo
-      echo "Note: CF Preferred IP links are not generated by default in Quick Mode because many clients import/test them incorrectly. Add a preferred IP manually only after the normal Argo link works."
-    } >> "$LINK_FILE"
+stop_old_pooyan() {
+  if [ -f "$ARGO_PID" ]; then
+    kill "$(cat "$ARGO_PID")" >/dev/null 2>&1 || true
+    rm -f "$ARGO_PID"
   fi
-
-  # Pure links only, useful for v2rayN import.
-  grep '^vless://' "$LINK_FILE" > /root/pooyan-v2rayn-import.txt 2>/dev/null || true
-  if command -v base64 >/dev/null 2>&1; then
-    base64 -w0 /root/pooyan-v2rayn-import.txt > /root/pooyan-sub-base64.txt 2>/dev/null || base64 /root/pooyan-v2rayn-import.txt > /root/pooyan-sub-base64.txt 2>/dev/null || true
-  fi
-  cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
+  pkill -f "cloudflared.*127.0.0.1" >/dev/null 2>&1 || true
 }
 
-write_direct_only_links(){
-  local uuid="$1" server_ip="$2" port="$3" path="$4" label_prefix="$5"
-  mkdir -p "$APP_DIR"
-  : > "$LINK_FILE"
-  {
-    echo "Pooyan ${PROJECT_VERSION} - Direct IP Quick Link"
-    echo "UUID: ${uuid}"
-    echo "Server IP: ${server_ip}"
-    echo "Port: ${port}"
-    echo "WS Path: /${path}"
-  } >> "$LINK_FILE"
-  append_direct_ip_links "$uuid" "$server_ip" "$port" "$path" "$label_prefix"
-}
-
-extract_trycloudflare_url(){
-  grep -oE 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' /tmp/pooyan-argo.log 2>/dev/null | head -n1 | sed 's#https://##' || true
-}
-
-start_quick_cloudflared_once(){
-  local port="$1" mode="$2"
-  : > /tmp/pooyan-argo.log
-  case "$mode" in
-    default)
-      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate >/tmp/pooyan-argo.log 2>&1 &
-      ;;
-    http2)
-      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate --protocol http2 >/tmp/pooyan-argo.log 2>&1 &
-      ;;
-    quic)
-      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate --protocol quic >/tmp/pooyan-argo.log 2>&1 &
-      ;;
-  esac
-}
-
-get_trycloudflare_with_retries(){
-  local port="$1" mode n argo
-  for mode in default http2 quic; do
-    yellow "Starting cloudflared quick tunnel (${mode})..." >&2
-    pkill -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1 || true
-    start_quick_cloudflared_once "$port" "$mode"
-    argo=""
-    for n in $(seq 1 60); do
-      argo="$(extract_trycloudflare_url)"
-      [ -n "$argo" ] && { echo "$argo"; return 0; }
-      if ! pgrep -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
-    yellow "No trycloudflare URL from mode: ${mode}. Last cloudflared log:" >&2
-    tail -n 12 /tmp/pooyan-argo.log >&2 2>/dev/null || true
-  done
-  return 1
-}
-
-cloudflared_login_if_needed(){
-  mkdir -p /root/.cloudflared
-  if ls /root/.cloudflared/cert.pem >/dev/null 2>&1; then
-    green "Cloudflare login already exists: /root/.cloudflared/cert.pem"
-    return 0
-  fi
-  yellow "Cloudflare login is needed. A browser authorization URL will appear."
-  "$CLOUDFLARED_BIN" tunnel login
-}
-
-make_tunnel_name(){
-  printf '%s' "$1" | awk -F. '{print $1}' | tr -cd 'A-Za-z0-9_-'
-}
-
-setup_vless_cloudflare_service(){
-  banner
-  blue "Custom Domain Mode: VLESS + WS + Cloudflare Tunnel + service + BBR"
-  echo
-  local domain uuid path port tunnel_name tunnel_id label
-  domain="$(ask_default "Full Cloudflare subdomain / دامنه کامل Cloudflare" "vpn.example.com")"
-  if ! validate_domain "$domain"; then
-    red "Invalid domain: $domain"
-    exit 1
-  fi
-  uuid="$(random_uuid)"
-  path="$(random_path)"
-  port="$(random_port)"
-  tunnel_name="$(make_tunnel_name "$domain")"
-  label="Pooyan-China"
-
-  ensure_deps
-  install_binaries
-  enable_bbr
-  make_vless_ws_config "$uuid" "$port" "$path"
-
-  xray_check_config "${APP_DIR}/config.json"
-
-  cloudflared_login_if_needed
-  yellow "Creating or reusing Cloudflare tunnel: ${tunnel_name}"
-  if ! "$CLOUDFLARED_BIN" tunnel list 2>/dev/null | awk '{print $2}' | grep -qx "$tunnel_name"; then
-    "$CLOUDFLARED_BIN" tunnel create "$tunnel_name"
-  fi
-  "$CLOUDFLARED_BIN" tunnel route dns --overwrite-dns "$tunnel_name" "$domain" || true
-
-  tunnel_id="$($CLOUDFLARED_BIN tunnel list 2>/dev/null | awk -v n="$tunnel_name" '$2==n {print $1; exit}')"
-  if [ -z "${tunnel_id:-}" ]; then
-    red "Could not read Cloudflare tunnel UUID. Run: cloudflared tunnel list"
-    exit 1
-  fi
-
-  cat > "${APP_DIR}/cloudflared.yml" <<EOF_YAML
-tunnel: ${tunnel_id}
-credentials-file: /root/.cloudflared/${tunnel_id}.json
-protocol: http2
-edge-ip-version: 4
-ingress:
-  - hostname: ${domain}
-    service: http://127.0.0.1:${port}
-  - service: http_status:404
-EOF_YAML
-
-  write_systemd_service "xray" "${XRAY_BIN} run -config ${APP_DIR}/config.json" "Pooyan Xray Service"
-  write_systemd_service "cloudflared" "${CLOUDFLARED_BIN} tunnel --config ${APP_DIR}/cloudflared.yml run" "Pooyan Cloudflare Tunnel"
-  write_manager
-  reload_systemd
-  start_enable_service xray
-  start_enable_service cloudflared
-  write_ws_links "$uuid" "$domain" "$path" "$label"
-
-  green "Done. Links saved to ${LINK_FILE} and ${ROOT_LINK_FILE}"
-  echo
-  cat "$LINK_FILE"
-}
-
-quick_tunnel(){
-  banner
-  blue "Quick Mode: Direct IP first + trycloudflare.com if available"
-  yellow "No Cloudflare account/domain is needed. Direct IP is generated even if trycloudflare fails."
-  yellow "Do not copy wrapped links from PuTTY. Use: cat /root/v2ray.txt  or download /root/pooyan-v2rayn-import.txt"
-  echo
-  local uuid path port argo label server_ip
-  uuid="$(random_uuid)"
-  path="$(random_path)"
-  port="$(random_port)"
-  label="Pooyan-Quick"
-
-  ensure_deps
-  install_binaries
-  make_vless_ws_config "$uuid" "$port" "$path" "0.0.0.0"
-  xray_check_config "${APP_DIR}/config.json"
-  open_firewall_port_best_effort "$port"
-
-  stop_disable_service cloudflared
-  stop_disable_service xray
-  pkill -f "${XRAY_BIN}" >/dev/null 2>&1 || true
-  pkill -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1 || true
-
-  write_systemd_service "xray" "${XRAY_BIN} run -config ${APP_DIR}/config.json" "Pooyan Xray Quick Direct Service"
-  write_manager
-  reload_systemd
-  start_enable_service xray
-  if ! pgrep -f "${XRAY_BIN} run -config ${APP_DIR}/config.json" >/dev/null 2>&1; then
-    nohup "$XRAY_BIN" run -config "${APP_DIR}/config.json" >/tmp/pooyan-xray.log 2>&1 &
-  fi
-  sleep 2
-
-  server_ip="$(public_ip | tr -d '\n' | tr -d ' ')"
-  write_quick_links "$uuid" "$server_ip" "$port" "$path" "" "$label"
-  green "Direct IP quick link generated first: ${server_ip}:${port}"
-  green "Manager installed: run pooyan"
-
-  argo=""
-  if argo="$(get_trycloudflare_with_retries "$port")" && [ -n "$argo" ]; then
-    write_quick_links "$uuid" "$server_ip" "$port" "$path" "$argo" "$label"
-    green "Quick tunnel created: ${argo}"
-    green "Clean import file: /root/pooyan-v2rayn-import.txt"
-    cat "$LINK_FILE"
-  else
-    red "Could not get trycloudflare.com URL after several attempts."
-    yellow "Direct IP link was still created and saved to: ${LINK_FILE} and ${ROOT_LINK_FILE}"
-    yellow "Check cloudflared log: cat /tmp/pooyan-argo.log"
-    echo
-    cat "$LINK_FILE"
-    exit 0
-  fi
-}
-
-reality_keys(){
-  local out private public
-  out="$($XRAY_BIN x25519 2>/dev/null || true)"
-  private="$(printf '%s\n' "$out" | awk -F': ' '/Private key/ {print $2}')"
-  public="$(printf '%s\n' "$out" | awk -F': ' '/Public key/ {print $2}')"
-  if [ -z "$private" ] || [ -z "$public" ]; then
-    red "Could not generate Reality x25519 keys. Is Xray installed correctly?"
-    exit 1
-  fi
-  printf '%s\n%s\n' "$private" "$public"
-}
-
-setup_reality_vision(){
-  banner
-  blue "Advanced: VLESS + REALITY + Vision direct"
-  yellow "Use this only on a good CN2/CMI/AS9929 VPS, not through Cloudflare Tunnel."
-  echo
-  local uuid port sni dest sid private public server_ip label
-  uuid="$(random_uuid)"
-  port="$(ask_default "Reality port" "443")"
-  sni="$(ask_default "Reality SNI/serverName" "www.microsoft.com")"
-  dest="$(ask_default "Reality dest" "${sni}:443")"
-  sid="$(openssl rand -hex 4)"
-  label="Pooyan-Reality"
-
-  ensure_deps
-  install_binaries
-  enable_bbr
-  mapfile -t keys < <(reality_keys)
-  private="${keys[0]}"
-  public="${keys[1]}"
-
-  cat > "${APP_DIR}/config.json" <<EOF_JSON
+write_xray_config() {
+  local uuid="$1" port="$2" path="$3"
+  mkdir -p "$(dirname "$XRAY_CONFIG")"
+  cat > "$XRAY_CONFIG" <<JSON
 {
-  "log": {
-    "loglevel": "warning"
-  },
+  "log": { "loglevel": "warning" },
   "inbounds": [
     {
+      "tag": "pooyan-vless-ws",
       "listen": "0.0.0.0",
       "port": ${port},
       "protocol": "vless",
       "settings": {
-        "clients": [
-          {
-            "id": "${uuid}",
-            "flow": "xtls-rprx-vision"
-          }
-        ],
+        "clients": [ { "id": "${uuid}", "level": 0 } ],
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "tcp",
-        "security": "reality",
-        "realitySettings": {
-          "show": false,
-          "dest": "${dest}",
-          "xver": 0,
-          "serverNames": ["${sni}"],
-          "privateKey": "${private}",
-          "shortIds": ["${sid}"]
-        }
+        "network": "ws",
+        "wsSettings": { "path": "${path}" }
       }
     }
   ],
   "outbounds": [
-    {
-      "protocol": "freedom",
-      "tag": "direct"
-    }
+    { "protocol": "freedom", "tag": "direct" }
   ]
 }
-EOF_JSON
-  xray_check_config "${APP_DIR}/config.json"
-
-  write_systemd_service "xray" "${XRAY_BIN} run -config ${APP_DIR}/config.json" "Pooyan Xray Reality Service"
-  rm -f /etc/systemd/system/cloudflared.service
-  write_manager
-  reload_systemd
-  stop_disable_service cloudflared
-  start_enable_service xray
-
-  server_ip="$(public_ip | tr -d '\n' | tr -d ' ')"
-  mkdir -p "$APP_DIR"
-  cat > "$LINK_FILE" <<EOF_LINK
-Pooyan ${PROJECT_VERSION} - VLESS REALITY Vision Direct
-Server IP: ${server_ip}
-Port: ${port}
-UUID: ${uuid}
-SNI: ${sni}
-PublicKey: ${public}
-ShortID: ${sid}
-
-vless://${uuid}@${server_ip}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${public}&sid=${sid}&type=tcp&flow=xtls-rprx-vision#$(url_encode_label "${label}")
-EOF_LINK
-  cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
-  green "Done. Reality link saved to ${LINK_FILE} and ${ROOT_LINK_FILE}"
-  echo
-  cat "$LINK_FILE"
-}
-
-write_manager(){
-  cat > "$APP_CMD" <<'EOF_MANAGER'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-APP_DIR="/opt/pooyan"
-LINK_FILE="${APP_DIR}/v2ray.txt"
-status_one(){
-  local svc="$1"
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files "${svc}.service" >/dev/null 2>&1; then
-    printf '%-12s %s\n' "$svc" "$(systemctl is-active "$svc" 2>/dev/null || echo missing)"
-  else
-    printf '%-12s missing\n' "$svc"
+JSON
+  if ! "$XRAY_BIN" run -test -config "$XRAY_CONFIG" >/tmp/pooyan-xray-test.log 2>&1; then
+    cat /tmp/pooyan-xray-test.log || true
+    red "Xray config test failed."
+    exit 1
   fi
 }
-while true; do
-  clear || true
-  echo "Pooyan Manager"
-  echo "=============================="
-  status_one xray
-  status_one cloudflared
-  echo
-  echo "1) Start services"
-  echo "2) Stop services"
-  echo "3) Restart services"
-  echo "4) Show links"
-  echo "5) Show logs"
-  echo "6) Uninstall Pooyan"
-  echo "0) Exit"
-  echo
-  read -r -p "Choose [0]: " c || true
-  c="${c:-0}"
-  case "$c" in
-    1)
-      systemctl start xray 2>/dev/null || true
-      systemctl start cloudflared 2>/dev/null || true
-      ;;
-    2)
-      systemctl stop cloudflared 2>/dev/null || true
-      systemctl stop xray 2>/dev/null || true
-      ;;
-    3)
-      systemctl restart xray 2>/dev/null || true
-      systemctl restart cloudflared 2>/dev/null || true
-      ;;
-    4)
-      clear || true
-      if [ -f "$LINK_FILE" ]; then cat "$LINK_FILE"; else echo "No link file: $LINK_FILE"; fi
-      read -r -p "Enter to continue..." _ || true
-      ;;
-    5)
-      clear || true
-      journalctl -u xray -u cloudflared --no-pager -n 80 2>/dev/null || true
-      read -r -p "Enter to continue..." _ || true
-      ;;
-    6)
-      systemctl stop cloudflared xray 2>/dev/null || true
-      systemctl disable cloudflared xray 2>/dev/null || true
-      rm -f /etc/systemd/system/cloudflared.service /etc/systemd/system/xray.service /usr/bin/pooyan
-      rm -rf /opt/pooyan
-      systemctl daemon-reload 2>/dev/null || true
-      echo "Removed. Cloudflare auth files in /root/.cloudflared were kept intentionally."
-      exit 0
-      ;;
-    0) exit 0 ;;
-  esac
-done
-EOF_MANAGER
-  chmod +x "$APP_CMD"
+
+start_xray() {
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q '^xray\.service'; then
+    systemctl enable xray >/dev/null 2>&1 || true
+    systemctl restart xray
+  else
+    pkill -f "xray.*${XRAY_CONFIG}" >/dev/null 2>&1 || true
+    nohup "$XRAY_BIN" run -config "$XRAY_CONFIG" >/tmp/pooyan-xray.log 2>&1 &
+  fi
 }
 
-uninstall_pooyan(){
-  banner
-  yellow "Removing Pooyan services and files..."
-  stop_disable_service cloudflared
-  stop_disable_service xray
-  rm -f /etc/systemd/system/cloudflared.service /etc/systemd/system/xray.service "$APP_CMD"
-  rm -rf "$APP_DIR"
-  reload_systemd
-  green "Removed. /root/.cloudflared was kept, so your Cloudflare login is not deleted."
+start_quick_tunnel() {
+  local port="$1"
+  : > "$ARGO_LOG"
+  stop_old_pooyan
+  nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --edge-ip-version auto --no-autoupdate >"$ARGO_LOG" 2>&1 &
+  echo $! > "$ARGO_PID"
 }
 
-show_links(){
+wait_trycloudflare_host() {
+  local host="" i
+  for i in $(seq 1 75); do
+    host="$(grep -Eo 'https://[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com' "$ARGO_LOG" 2>/dev/null | head -n1 | sed 's#https://##')"
+    if [ -n "$host" ]; then echo "$host"; return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+vless_link() {
+  local server="$1" port="$2" security="$3" host="$4" path="$5" uuid="$6" remark="$7"
+  local enc_path
+  enc_path="%2F${path#/}"
+  if [ "$security" = "tls" ]; then
+    printf 'vless://%s@%s:%s?encryption=none&security=tls&sni=%s&fp=chrome&type=ws&host=%s&path=%s#%s\n' \
+      "$uuid" "$server" "$port" "$host" "$host" "$enc_path" "$remark"
+  else
+    if [ -n "$host" ]; then
+      printf 'vless://%s@%s:%s?encryption=none&security=none&type=ws&host=%s&path=%s#%s\n' \
+        "$uuid" "$server" "$port" "$host" "$enc_path" "$remark"
+    else
+      printf 'vless://%s@%s:%s?encryption=none&security=none&type=ws&path=%s#%s\n' \
+        "$uuid" "$server" "$port" "$enc_path" "$remark"
+    fi
+  fi
+}
+
+save_links() {
+  local uuid="$1" local_port="$2" path="$3" ip="$4" cf_domain="$5" try_host="${6:-}"
+  : > "$IMPORT_FILE"
+
+  # Direct IP is always first, because it does not depend on Cloudflare.
+  vless_link "$ip" "$local_port" "none" "" "$path" "$uuid" "Pooyan-DIRECT-IP-${local_port}" >> "$IMPORT_FILE"
+
+  if [ -n "$try_host" ]; then
+    # Direct trycloudflare hostname, then old China-style front-domain variants.
+    vless_link "$try_host" 443 "tls" "$try_host" "$path" "$uuid" "Pooyan-TRY-TLS-443" >> "$IMPORT_FILE"
+
+    for p in "${HTTP_PORTS[@]}"; do
+      vless_link "$cf_domain" "$p" "none" "$try_host" "$path" "$uuid" "Pooyan-OLD-HTTP-${p}" >> "$IMPORT_FILE"
+    done
+    for p in "${HTTPS_PORTS[@]}"; do
+      vless_link "$cf_domain" "$p" "tls" "$try_host" "$path" "$uuid" "Pooyan-OLD-TLS-${p}" >> "$IMPORT_FILE"
+    done
+  fi
+
+  base64 "$IMPORT_FILE" | tr -d '\n' > "$SUB_FILE" || true
+
+  cat > "$LINK_FILE" <<EOF2
+Pooyan ${PROJECT_VERSION} - China Stable Links
+==============================================
+
+VPS IP: ${ip}
+Local VLESS WS port: ${local_port}
+UUID: ${uuid}
+WS path: ${path}
+CF front domain: ${cf_domain}
+TryCloudflare host: ${try_host:-FAILED / not generated}
+
+IMPORTANT:
+- For v2rayN, import from this file only:
+  ${IMPORT_FILE}
+- Do NOT paste VLESS links into Linux/PuTTY command line. The & characters will break the link.
+- Direct IP link is first. It has no domain and no TLS.
+- Old-style China links use ${cf_domain} as address and trycloudflare.com as Host/SNI.
+
+Files:
+- Human readable: ${LINK_FILE}
+- v2rayN import:  ${IMPORT_FILE}
+- Base64 sub:     ${SUB_FILE}
+
+Links:
+$(cat "$IMPORT_FILE")
+EOF2
+}
+
+print_links() {
   if [ -f "$LINK_FILE" ]; then
     cat "$LINK_FILE"
-  elif [ -f "$ROOT_LINK_FILE" ]; then
-    cat "$ROOT_LINK_FILE"
   else
-    red "No links found. Install first."
+    red "No links yet. Run option 1 first."
   fi
 }
 
-main_menu(){
+quick_china_stable() {
+  need_root
   banner
-  echo "1) Quick Mode - Direct IP first + Auto trycloudflare.com  (بدون دامنه)"
-  echo "2) Custom Domain - VLESS + Cloudflare Tunnel + service + BBR"
-  echo "3) Advanced - VLESS + REALITY + Vision direct"
-  echo "4) Show current links"
-  echo "5) Manager menu"
-  echo "6) Uninstall"
-  echo "0) Exit"
+  cyan "Quick China Stable mode"
+  yellow "برمی‌گردیم به مدل قدیمی خوب: trycloudflare + cloudflare.182682.xyz + پورت‌های رسمی Cloudflare."
   echo
-  echo "建议中国用户：先选 1，不需要域名；如果你有 Cloudflare 域名，再选 2。"
-  echo "پیشنهاد برای چین: اول گزینه 1؛ اول لینک Direct IP بدون دامنه را می‌سازد و دستور pooyan را نصب می‌کند؛ اگر Cloudflare جواب بدهد لینک trycloudflare هم اضافه می‌کند."
+
+  install_self_manager
+  install_pkgs
+  install_xray
+  install_cloudflared
+
+  local uuid path local_port ip cf_domain try_host
+  uuid="$(new_uuid)"
+  path="/${uuid}"
+  local_port="$(random_port)"
+  ip="$(public_ip)"
+  [ -n "$ip" ] || ip="YOUR_SERVER_IP"
+
+  read -r -p "CF front domain [${DEFAULT_CF_DOMAIN}]: " cf_domain || true
+  cf_domain="${cf_domain:-$DEFAULT_CF_DOMAIN}"
+
+  write_xray_config "$uuid" "$local_port" "$path"
+  start_xray
+  open_firewall_port "$local_port"
+
+  mkdir -p "$APP_DIR"
+  cat > "$STATE_FILE" <<EOF2
+UUID='${uuid}'
+PATH_VALUE='${path}'
+LOCAL_PORT='${local_port}'
+SERVER_IP='${ip}'
+CF_DOMAIN='${cf_domain}'
+EOF2
+
+  start_quick_tunnel "$local_port"
+  yellow "Waiting for trycloudflare.com address..."
+  if try_host="$(wait_trycloudflare_host)"; then
+    green "trycloudflare host: ${try_host}"
+    echo "TRY_HOST='${try_host}'" >> "$STATE_FILE"
+  else
+    red "Could not get trycloudflare.com URL. Direct IP link will still be generated."
+    yellow "Check: cat ${ARGO_LOG}"
+    try_host=""
+  fi
+
+  save_links "$uuid" "$local_port" "$path" "$ip" "$cf_domain" "$try_host"
+
   echo
-  read -r -p "Select [1]: " choice || true
-  choice="${choice:-1}"
-  case "$choice" in
-    1) quick_tunnel ;;
-    2) setup_vless_cloudflare_service ;;
-    3) setup_reality_vision ;;
-    4) show_links ;;
-    5) if [ -x "$APP_CMD" ]; then "$APP_CMD"; else red "Manager is not installed yet."; fi ;;
-    6) uninstall_pooyan ;;
-    0) exit 0 ;;
-    *) red "Invalid choice"; exit 1 ;;
-  esac
+  green "Done. / آماده شد."
+  echo
+  cyan "Use this for v2rayN import:"
+  echo "cat ${IMPORT_FILE}"
+  echo
+  print_links
 }
 
-need_root
-main_menu "$@"
+status_view() {
+  echo "Pooyan ${PROJECT_VERSION} status"
+  echo "---------------------------"
+  if command -v xray >/dev/null 2>&1; then xray version | head -n1 || true; fi
+  if pgrep -x xray >/dev/null 2>&1 || pgrep -f "xray.*${XRAY_CONFIG}" >/dev/null 2>&1; then green "Xray: running"; else red "Xray: not running"; fi
+  if [ -f "$ARGO_PID" ] && kill -0 "$(cat "$ARGO_PID")" >/dev/null 2>&1; then green "cloudflared: running"; else red "cloudflared: not running"; fi
+  if [ -f "$STATE_FILE" ]; then echo; cat "$STATE_FILE"; fi
+}
+
+logs_view() {
+  echo "--- cloudflared log: ${ARGO_LOG} ---"
+  tail -n 80 "$ARGO_LOG" 2>/dev/null || true
+  echo
+  echo "--- xray log: /tmp/pooyan-xray.log ---"
+  tail -n 80 /tmp/pooyan-xray.log 2>/dev/null || true
+}
+
+uninstall_pooyan() {
+  red "Removing Pooyan quick tunnel and links..."
+  stop_old_pooyan
+  rm -f "$LINK_FILE" "$IMPORT_FILE" "$SUB_FILE" "$STATE_FILE" "$ARGO_LOG" "$ARGO_PID"
+  rm -f "$APP_CMD"
+  rm -rf "$APP_DIR"
+  green "Pooyan removed. Xray package itself was kept."
+}
+
+menu() {
+  need_root
+  install_self_manager >/dev/null 2>&1 || true
+  while true; do
+    banner
+    echo "1) Quick China Stable - old good configs + Direct IP"
+    echo "2) Show links / نمایش لینک‌ها"
+    echo "3) Status / وضعیت"
+    echo "4) Logs / لاگ‌ها"
+    echo "5) Uninstall Pooyan files / حذف فایل‌های Pooyan"
+    echo "0) Exit"
+    echo
+    read -r -p "Choose [1]: " c || true
+    case "${c:-1}" in
+      1) quick_china_stable; pause ;;
+      2) banner; print_links; pause ;;
+      3) banner; status_view; pause ;;
+      4) banner; logs_view; pause ;;
+      5) banner; uninstall_pooyan; pause ;;
+      0) exit 0 ;;
+      *) echo "Invalid"; sleep 1 ;;
+    esac
+  done
+}
+
+case "${1:-menu}" in
+  quick) quick_china_stable ;;
+  links) print_links ;;
+  status) status_view ;;
+  logs) logs_view ;;
+  uninstall) uninstall_pooyan ;;
+  menu|*) menu ;;
+esac
