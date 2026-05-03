@@ -1,41 +1,29 @@
 # Changelog
 
+## 0.10
+
+- Added a Direct IP link without domain in Quick Mode.
+- Quick Mode now generates both:
+  - automatic `trycloudflare.com` links
+  - direct VPS IP VLESS WS link for speed testing
+- Quick Mode Xray inbound now listens on `0.0.0.0` so the direct IP link can work.
+- Added best-effort firewall opening for the generated direct TCP port using `ufw`, `firewall-cmd`, or `iptables` when available.
+- Updated menu text and README for the new no-domain direct test link.
+
 ## 0.09
 
-Emergency fix for Xray-core config validation.
-
-### Fixed
-
-- Fixed the `xray test: unknown command` error.
-- Replaced the broken direct `xray test -config` call with `xray run -test -config`.
-- Added a compatibility function that tries the new command first and keeps fallback behavior for older builds.
-- Auto Domain mode still does not ask for a custom domain.
-
-### Changed
-
-- Version bumped from 0.08 to 0.09.
-- README updated with the Xray test fix.
+- Fixed Xray config test command for newer Xray-core versions.
+- Uses `xray run -test -config` with fallback to older `xray test -config`.
 
 ## 0.08
 
-Emergency fix for default installation behavior.
-
-### Fixed
-
-- Restored the old default behavior: the script no longer asks for a domain by default.
-- Option 1 now uses automatic `trycloudflare.com` address generation.
-- Custom Cloudflare domain setup moved to option 2.
-- Menu text now clearly says which mode needs a domain and which mode does not.
-
-### Changed
-
-- Version bumped from 0.07 to 0.08.
-- README updated to explain Auto Domain vs Custom Domain.
+- Restored Auto Domain mode using `trycloudflare.com`.
+- No Cloudflare account or domain is needed for Option 1.
 
 ## 0.07
 
-- Added China Recommended mode.
-- Added Cloudflare custom domain tunnel mode.
-- Added multi-port VLESS WS links.
-- Added REALITY/Vision mode.
-- Added BBR helper.
+- Added China Recommended structure.
+- Added VLESS + WebSocket + Cloudflare Tunnel mode.
+- Added REALITY/Vision advanced mode.
+- Added BBR enabling.
+- Added multi-port Cloudflare link generation.

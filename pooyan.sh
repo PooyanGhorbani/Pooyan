@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.09"
+PROJECT_VERSION="0.10"
 APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
@@ -34,7 +34,7 @@ banner(){
   clear || true
   line
   printf "%28s\n" "${APP_TITLE}"
-  printf "%38s\n" "Auto Domain China Edition - Fix Xray Test"
+  printf "%38s\n" "Auto Domain + Direct IP Edition"
   line
   echo
 }
@@ -265,7 +265,7 @@ xray_check_config(){
 }
 
 make_vless_ws_config(){
-  local uuid="$1" port="$2" path="$3"
+  local uuid="$1" port="$2" path="$3" listen_addr="${4:-127.0.0.1}"
   cat > "${APP_DIR}/config.json" <<EOF_JSON
 {
   "log": {
@@ -273,7 +273,7 @@ make_vless_ws_config(){
   },
   "inbounds": [
     {
-      "listen": "127.0.0.1",
+      "listen": "${listen_addr}",
       "port": ${port},
       "protocol": "vless",
       "settings": {
@@ -328,6 +328,34 @@ write_ws_links(){
     done
     echo
     echo "Tip: For China, test 443, 2053, 2083, 8443 first. Keep the fastest stable one."
+  } >> "$LINK_FILE"
+  cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
+}
+
+
+open_firewall_port_best_effort(){
+  local port="$1"
+  yellow "Trying to open TCP port ${port} locally if a firewall is active..."
+  if command -v ufw >/dev/null 2>&1; then
+    ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
+    firewall-cmd --reload >/dev/null 2>&1 || true
+  fi
+  if command -v iptables >/dev/null 2>&1; then
+    iptables -C INPUT -p tcp --dport "${port}" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT >/dev/null 2>&1 || true
+  fi
+}
+
+append_direct_ip_links(){
+  local uuid="$1" server_ip="$2" port="$3" path="$4" label_prefix="$5"
+  {
+    echo
+    echo "Direct IP link - NO domain / بدون دامنه"
+    echo "Use this only for quick speed test. It is faster/simple, but usually less stable for China than Cloudflare/Reality."
+    echo "If it cannot connect, open TCP port ${port} in the VPS provider security group/firewall."
+    echo "vless://${uuid}@${server_ip}:${port}?encryption=none&security=none&type=ws&path=/${path}#$(url_encode_label "${label_prefix}-DIRECT-IP-${port}")"
   } >> "$LINK_FILE"
   cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
 }
@@ -420,9 +448,12 @@ quick_tunnel(){
 
   ensure_deps
   install_binaries
-  make_vless_ws_config "$uuid" "$port" "$path"
+  make_vless_ws_config "$uuid" "$port" "$path" "0.0.0.0"
   xray_check_config "${APP_DIR}/config.json"
+  open_firewall_port_best_effort "$port"
 
+  stop_disable_service cloudflared
+  stop_disable_service xray
   pkill -f "${XRAY_BIN}" >/dev/null 2>&1 || true
   pkill -f "${CLOUDFLARED_BIN}" >/dev/null 2>&1 || true
   nohup "$XRAY_BIN" run -config "${APP_DIR}/config.json" >/tmp/pooyan-xray.log 2>&1 &
@@ -439,7 +470,10 @@ quick_tunnel(){
     exit 1
   fi
   write_ws_links "$uuid" "$argo" "$path" "$label"
+  server_ip="$(public_ip | tr -d '\n' | tr -d ' ')"
+  append_direct_ip_links "$uuid" "$server_ip" "$port" "$path" "$label"
   green "Quick tunnel created: ${argo}"
+  green "Direct IP test link was also generated: ${server_ip}:${port}"
   cat "$LINK_FILE"
 }
 
@@ -637,7 +671,7 @@ show_links(){
 
 main_menu(){
   banner
-  echo "1) Auto Domain - VLESS + trycloudflare.com  (NO domain needed / بدون دامنه)"
+  echo "1) Quick Mode - Auto trycloudflare.com + Direct IP link  (بدون دامنه اختیاری)"
   echo "2) Custom Domain - VLESS + Cloudflare Tunnel + service + BBR"
   echo "3) Advanced - VLESS + REALITY + Vision direct"
   echo "4) Show current links"
@@ -646,7 +680,7 @@ main_menu(){
   echo "0) Exit"
   echo
   echo "建议中国用户：先选 1，不需要域名；如果你有 Cloudflare 域名，再选 2。"
-  echo "پیشنهاد برای چین: اول گزینه 1؛ دامنه نمی‌خواهد. اگر دامنه Cloudflare داری، گزینه 2."
+  echo "پیشنهاد برای چین: اول گزینه 1؛ لینک trycloudflare می‌دهد و یک لینک Direct IP بدون دامنه هم برای تست سرعت می‌سازد."
   echo
   read -r -p "Select [1]: " choice || true
   choice="${choice:-1}"
