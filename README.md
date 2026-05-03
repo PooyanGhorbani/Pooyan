@@ -1,53 +1,63 @@
-# Pooyan 0.11
+# Pooyan 0.12
 
-China-friendly Xray installer with three modes:
+China-focused Xray installer with a safer Quick Mode.
+
+## Install
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-## Modes
+## Recommended for China
 
-1. **Quick Mode - Auto trycloudflare.com + Direct IP fallback**
-   - No domain needed
-   - No Cloudflare account needed
-   - Creates a Direct IP VLESS/WS link first
-   - Then tries to create a temporary `trycloudflare.com` link
-   - If Cloudflare quick tunnel fails, the Direct IP link is still saved
+Choose option **1** first:
 
-2. **Custom Domain Mode - VLESS + WS + Cloudflare Tunnel**
-   - Needs your own Cloudflare domain
-   - Stable hostname
-   - Runs as systemd services
-   - Enables BBR when possible
+```text
+Quick Mode - Direct IP first + Auto trycloudflare.com
+```
 
-3. **Advanced Mode - VLESS + REALITY + Vision**
-   - Direct VPS mode
-   - Recommended only for good China routes such as CN2 / CMI / AS9929
+This mode now creates the Direct IP link first, installs the `pooyan` manager command, and then tries to create a temporary `trycloudflare.com` link.
+
+## Important v2rayN note
+
+Do not paste VLESS links into the Linux shell. The `&` characters inside VLESS links are shell control characters.
+
+Use one of these files instead:
+
+```bash
+cat /root/v2ray.txt
+cat /root/pooyan-v2rayn-import.txt
+```
+
+For the cleanest v2rayN import, download this file with WinSCP or another SFTP client:
+
+```text
+/root/pooyan-v2rayn-import.txt
+```
 
 ## Manager
 
-After installation:
+After installation, run:
 
 ```bash
 pooyan
 ```
 
-Links are saved here:
+The manager can show links, logs, restart services, and uninstall Pooyan.
+
+## Files
 
 ```text
+/opt/pooyan/config.json
 /opt/pooyan/v2ray.txt
 /root/v2ray.txt
+/root/pooyan-v2rayn-import.txt
+/root/pooyan-sub-base64.txt
+/usr/bin/pooyan
 ```
 
-## Important notes
+## Modes
 
-- Quick `trycloudflare.com` addresses are temporary and can change after rerun/reboot.
-- Direct IP links need the TCP port open in the VPS firewall/security group.
-- For China, test several Cloudflare ports and keep the fastest stable one.
-- If Quick Mode cannot get a trycloudflare URL, check:
-
-```bash
-cat /tmp/pooyan-argo.log
-cat /tmp/pooyan-xray.log
-```
+1. **Quick Mode** — Direct IP first, then trycloudflare.com if Cloudflare is reachable.
+2. **Custom Domain** — Cloudflare Tunnel with your own domain.
+3. **Advanced Reality** — VLESS + REALITY + Vision direct mode for good CN2/CMI/AS9929 VPS routes.
