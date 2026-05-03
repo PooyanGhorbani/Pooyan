@@ -1,33 +1,20 @@
-# CHANGELOG
+# Changelog
 
-## 0.13
+## 0.14 - RackNerd Stable Only
 
-- Reverted Quick mode to the old stable China-style connection layout.
-- Removed the problematic CF Preferred IP auto-links from quick output.
-- Added one Direct IP VLESS WS link without domain and without TLS.
-- Added many old-style Cloudflare front-domain links:
-  - HTTP: 80, 8080, 8880, 2052, 2082, 2086, 2095
-  - HTTPS/TLS: 443, 2053, 2083, 2087, 2096, 8443
-- Always installs the `pooyan` manager command.
-- Always writes clean import-only links to `/root/pooyan-v2rayn-import.txt`.
-- Prevents installation from stopping if TryCloudflare fails; Direct IP is still generated.
+- Rebuilt quick mode specifically for RackNerd.
+- Removed noisy extra ports from the quick output.
+- Keeps only the connections that were useful in the user's RackNerd/v2rayN tests:
+  - CF old-style 443
+  - CF old-style 80
+  - trycloudflare 443
+  - trycloudflare 80
+  - Direct IP backup/test
+- Added stronger trycloudflare creation retry logic: http2 IPv4, http2 auto, quic IPv4, default.
+- Always creates `/root/pooyan-v2rayn-import.txt` for clean v2rayN import.
+- Keeps `pooyan` manager command working.
 
-## 0.12
+## 0.13 - China Stable Restore
 
-- Attempted quick manager fix.
-
-## 0.11
-
-- Added quick fallback.
-
-## 0.10
-
-- Added Direct IP quick mode.
-
-## 0.09
-
-- Fixed Xray config test command.
-
-## 0.08
-
-- Restored Auto Domain mode.
+- Restored old VLESS + WS + trycloudflare style.
+- Added Direct IP fallback.

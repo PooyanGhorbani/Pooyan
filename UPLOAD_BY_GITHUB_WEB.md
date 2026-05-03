@@ -1,27 +1,18 @@
-# Upload to GitHub by Web
+# GitHub Web Upload Guide
 
-Keep only these files in the root of the repo:
-
-```text
-pooyan.sh
-README.md
-CHANGELOG.md
-VERSION
-LICENSE
-```
-
-Replace these files:
+Replace only these files in the root of the repository:
 
 - `pooyan.sh`
 - `README.md`
 - `CHANGELOG.md`
 - `VERSION`
 
-Delete old version-named files from the root, such as:
+Do not upload versioned script names like `pooyan_0.14.sh` to the repository root.
 
-```text
-pooyan_0.07.sh
-README_Pooyan_0.07.md
-CHANGELOG_Pooyan_0.07.md
-upload_commands_pooyan_0.07.txt
+After upload, install with:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
+
+For RackNerd, choose option `1`.

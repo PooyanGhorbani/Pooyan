@@ -1,46 +1,49 @@
-# Pooyan 0.13 - China Stable
+# Pooyan 0.14 - RackNerd Stable Only
 
-Install:
+This version is intentionally small and clean for RackNerd VPS use.
+
+## What it builds
+
+Only 5 links maximum:
+
+1. `Pooyan-RN-CF-443` - old-style China Cloudflare front link
+2. `Pooyan-RN-CF-80` - old-style China Cloudflare front link
+3. `Pooyan-RN-TRY-443` - direct trycloudflare link
+4. `Pooyan-RN-TRY-80` - direct trycloudflare link
+5. `Pooyan-RN-DIRECT-IP` - Direct IP backup/test link
+
+No 2053/2083/2087/2096/8443 links are generated in this RackNerd-only version, to avoid clutter and handshake-test noise.
+
+## Install
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-Then choose option `1`.
+Choose option `1`.
 
-## What changed in 0.13
+## v2rayN import
 
-This version restores the old stable style:
-
-- VLESS + WebSocket
-- Auto `trycloudflare.com` Quick Tunnel
-- Old China-style Cloudflare front domain links using `cloudflare.182682.xyz`
-- Official Cloudflare HTTP ports: `80, 8080, 8880, 2052, 2082, 2086, 2095`
-- Official Cloudflare HTTPS ports: `443, 2053, 2083, 2087, 2096, 8443`
-- Direct IP link without domain and without TLS
-- `pooyan` command is installed automatically
-- Clean v2rayN import file is generated at:
+Use this file only:
 
 ```bash
-/root/pooyan-v2rayn-import.txt
+cat /root/pooyan-v2rayn-import.txt
 ```
 
-Do not paste VLESS links into the Linux shell because `&` breaks the URL. Import from the file above.
+Do not paste VLESS links into the Linux/PuTTY command line, because `&` breaks the link.
 
-## Commands
+## Manager
 
 ```bash
-pooyan
-pooyan quick
+pooyan renew
 pooyan links
+pooyan import
 pooyan status
 pooyan logs
 ```
 
-## Important files
+## Files
 
-```text
-/root/v2ray.txt
-/root/pooyan-v2rayn-import.txt
-/root/pooyan-sub.txt
-```
+- Human-readable links: `/root/v2ray.txt`
+- Clean v2rayN import: `/root/pooyan-v2rayn-import.txt`
+- Base64 subscription: `/root/pooyan-sub.txt`
