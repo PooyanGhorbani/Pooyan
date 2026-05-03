@@ -1,4 +1,4 @@
-# Pooyan 0.08
+# Pooyan 0.09
 
 Auto Domain China Edition.
 
@@ -8,18 +8,32 @@ Auto Domain China Edition.
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-## Important fix in 0.08
+## Important fix in 0.09
 
-Version 0.07 asked for a Cloudflare domain by default. This was not the old behavior.
+Version 0.08 restored Auto Domain mode, but one Xray check command was wrong on newer Xray-core builds.
 
-Version 0.08 restores the old easy behavior as the default:
+Fixed:
 
-- Option 1: Auto Domain with `trycloudflare.com`
+```bash
+xray test -config config.json
+```
+
+Changed to the compatible check:
+
+```bash
+xray run -test -config config.json
+```
+
+The script also keeps a fallback for older builds.
+
+## Default behavior
+
+Option 1 is the old easy behavior:
+
+- Auto Domain with `trycloudflare.com`
 - No Cloudflare account is required
-- No domain is required
+- No custom domain is required
 - The script automatically creates the temporary Cloudflare address and prints VLESS links
-
-If you want a fixed custom domain, use option 2.
 
 ## Menu
 

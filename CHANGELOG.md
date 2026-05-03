@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.09
+
+Emergency fix for Xray-core config validation.
+
+### Fixed
+
+- Fixed the `xray test: unknown command` error.
+- Replaced the broken direct `xray test -config` call with `xray run -test -config`.
+- Added a compatibility function that tries the new command first and keeps fallback behavior for older builds.
+- Auto Domain mode still does not ask for a custom domain.
+
+### Changed
+
+- Version bumped from 0.08 to 0.09.
+- README updated with the Xray test fix.
+
 ## 0.08
 
 Emergency fix for default installation behavior.

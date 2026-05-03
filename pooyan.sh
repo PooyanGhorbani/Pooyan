@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.08"
+PROJECT_VERSION="0.09"
 APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
@@ -34,7 +34,7 @@ banner(){
   clear || true
   line
   printf "%28s\n" "${APP_TITLE}"
-  printf "%38s\n" "Auto Domain China Edition"
+  printf "%38s\n" "Auto Domain China Edition - Fix Xray Test"
   line
   echo
 }
@@ -248,6 +248,22 @@ validate_domain(){
   printf '%s' "$1" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$'
 }
 
+
+xray_check_config(){
+  local config="$1"
+  # Newer Xray-core uses: xray run -test -config file
+  if "$XRAY_BIN" run -test -config "$config" >/tmp/pooyan-xray-test.log 2>&1; then
+    return 0
+  fi
+  # Compatibility fallback for older builds/wrappers
+  if "$XRAY_BIN" test -config "$config" >/tmp/pooyan-xray-test.log 2>&1; then
+    return 0
+  fi
+  red "Xray config test failed. Last output:"
+  cat /tmp/pooyan-xray-test.log 2>/dev/null || true
+  exit 1
+}
+
 make_vless_ws_config(){
   local uuid="$1" port="$2" path="$3"
   cat > "${APP_DIR}/config.json" <<EOF_JSON
@@ -351,7 +367,7 @@ setup_vless_cloudflare_service(){
   enable_bbr
   make_vless_ws_config "$uuid" "$port" "$path"
 
-  "$XRAY_BIN" test -config "${APP_DIR}/config.json" >/dev/null
+  xray_check_config "${APP_DIR}/config.json"
 
   cloudflared_login_if_needed
   yellow "Creating or reusing Cloudflare tunnel: ${tunnel_name}"
@@ -405,7 +421,7 @@ quick_tunnel(){
   ensure_deps
   install_binaries
   make_vless_ws_config "$uuid" "$port" "$path"
-  "$XRAY_BIN" test -config "${APP_DIR}/config.json" >/dev/null
+  xray_check_config "${APP_DIR}/config.json"
 
   pkill -f "${XRAY_BIN}" >/dev/null 2>&1 || true
   pkill -f "${CLOUDFLARED_BIN}" >/dev/null 2>&1 || true
@@ -500,7 +516,7 @@ setup_reality_vision(){
   ]
 }
 EOF_JSON
-  "$XRAY_BIN" test -config "${APP_DIR}/config.json" >/dev/null
+  xray_check_config "${APP_DIR}/config.json"
 
   write_systemd_service "xray" "${XRAY_BIN} run -config ${APP_DIR}/config.json" "Pooyan Xray Reality Service"
   rm -f /etc/systemd/system/cloudflared.service
