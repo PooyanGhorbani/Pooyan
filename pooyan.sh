@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.15"
-APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION} - RackNerd 3 Links Clean"
+PROJECT_VERSION="0.17"
+APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION} - RackNerd Strong 5 Links"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
 RAW_URL="https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh"
@@ -11,6 +11,13 @@ RAW_URL="https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh"
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 XRAY_BIN="/usr/local/bin/xray"
 CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+HYSTERIA_BIN="/usr/local/bin/hysteria"
+HYSTERIA_CONFIG="/etc/hysteria/config.yaml"
+HYSTERIA_CERT="/etc/hysteria/server.crt"
+HYSTERIA_KEY="/etc/hysteria/server.key"
+HYSTERIA_PORT="443"
+HYSTERIA_SNI="www.bing.com"
+
 LINK_FILE="/root/v2ray.txt"
 IMPORT_FILE="/root/pooyan-v2rayn-import.txt"
 SUB_FILE="/root/pooyan-sub.txt"
@@ -36,26 +43,24 @@ need_root() {
 banner() {
   clear || true
   echo "============================================================"
-  printf "%42s\n" "$APP_TITLE"
+  printf "%45s\n" "$APP_TITLE"
   echo "============================================================"
   echo
 }
 
 pause() { echo; read -r -p "Press Enter / اینتر بزن..." _ || true; }
 
-os_id() { . /etc/os-release 2>/dev/null || true; echo "${ID:-linux}"; }
-
 install_pkgs() {
   if command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y || true
-    apt-get install -y curl wget unzip tar ca-certificates openssl procps iproute2 lsof jq || true
+    apt-get install -y curl wget unzip tar ca-certificates openssl procps iproute2 lsof jq coreutils grep || true
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof jq || true
+    dnf install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof jq coreutils grep || true
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof jq || true
+    yum install -y curl wget unzip tar ca-certificates openssl procps-ng iproute lsof jq coreutils grep || true
   elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache bash curl wget unzip tar ca-certificates openssl procps iproute2 lsof jq || true
+    apk add --no-cache bash curl wget unzip tar ca-certificates openssl procps iproute2 lsof jq coreutils grep || true
   else
     yellow "Unknown package manager. Continuing..."
   fi
@@ -76,9 +81,8 @@ random_uuid() {
   fi
 }
 
-random_path() {
-  printf 'pooyan-%s' "$(openssl rand -hex 8)"
-}
+random_path() { printf 'pooyan-%s' "$(openssl rand -hex 8)"; }
+random_secret() { openssl rand -hex 16; }
 
 port_is_free() {
   local p="$1"
@@ -94,9 +98,7 @@ random_port() {
   echo "42727"
 }
 
-url_label() {
-  printf '%s' "$1" | sed 's/ /%20/g; s/#/%23/g; s/&/%26/g'
-}
+url_label() { printf '%s' "$1" | sed 's/ /%20/g; s/#/%23/g; s/&/%26/g'; }
 
 install_xray() {
   if command -v xray >/dev/null 2>&1; then
@@ -132,12 +134,38 @@ install_cloudflared() {
   chmod +x "$CLOUDFLARED_BIN"
 }
 
-enable_bbr() {
-  cyan "Enabling BBR if supported..."
+install_hysteria2() {
+  if command -v hysteria >/dev/null 2>&1; then
+    HYSTERIA_BIN="$(command -v hysteria)"
+    return 0
+  fi
+  if ! command -v systemctl >/dev/null 2>&1; then
+    yellow "No systemd found; skipping Hysteria2. VLESS links will still be generated."
+    return 1
+  fi
+  cyan "Installing Hysteria2..."
+  HYSTERIA_USER=root bash <(curl -fsSL https://get.hy2.sh/) || {
+    yellow "Hysteria2 install failed; continuing without HY2 link."
+    return 1
+  }
+  HYSTERIA_BIN="$(command -v hysteria || echo /usr/local/bin/hysteria)"
+}
+
+enable_network_tuning() {
+  cyan "Enabling BBR + RackNerd network tuning if supported..."
   modprobe tcp_bbr >/dev/null 2>&1 || true
-  cat >/etc/sysctl.d/99-pooyan-bbr.conf <<'EOF'
+  cat >/etc/sysctl.d/99-pooyan-racknerd.conf <<'EOF'
 net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
+net.ipv4.tcp_fastopen=3
+net.ipv4.tcp_mtu_probing=1
+net.ipv4.tcp_keepalive_time=600
+net.ipv4.tcp_keepalive_intvl=30
+net.ipv4.tcp_keepalive_probes=5
+net.core.rmem_max=67108864
+net.core.wmem_max=67108864
+net.ipv4.tcp_rmem=4096 87380 67108864
+net.ipv4.tcp_wmem=4096 65536 67108864
 EOF
   sysctl --system >/dev/null 2>&1 || true
 }
@@ -169,28 +197,40 @@ case "${1:-menu}" in
   import)
     [ -f "$IMPORT_FILE" ] && cat "$IMPORT_FILE" || echo "No import file: $IMPORT_FILE"
     ;;
+  test)
+    echo "== Listening TCP =="; ss -lntp 2>/dev/null | grep -E 'xray|cloudflared|hysteria|:443|:80' || true
+    echo; echo "== Listening UDP =="; ss -lunp 2>/dev/null | grep -E 'hysteria|:443' || true
+    echo; echo "== Xray =="; systemctl is-active xray 2>/dev/null || true
+    echo; echo "== Hysteria2 =="; systemctl is-active hysteria-server.service 2>/dev/null || true
+    echo; echo "== cloudflared host =="; grep -aEo 'https://[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com' "$ARGO_LOG" 2>/dev/null | tail -n1 || true
+    ;;
   status)
     echo "Xray:"; systemctl status xray --no-pager 2>/dev/null || true
-    echo; echo "Listening ports:"; ss -lntp 2>/dev/null | grep -E 'xray|cloudflared|pooyan' || true
+    echo; echo "Hysteria2:"; systemctl status hysteria-server.service --no-pager 2>/dev/null || true
+    echo; echo "Listening ports:"; ss -lntup 2>/dev/null | grep -E 'xray|cloudflared|hysteria|:443|:80' || true
     echo; echo "cloudflared process:"; pgrep -af cloudflared || true
     ;;
   logs)
     echo "--- Xray logs ---"; journalctl -u xray --no-pager -n 80 2>/dev/null || true
+    echo; echo "--- Hysteria2 logs ---"; journalctl -u hysteria-server.service --no-pager -n 80 2>/dev/null || true
     echo; echo "--- cloudflared quick tunnel log ---"; cat "$ARGO_LOG" 2>/dev/null || true
     ;;
   stop)
     pkill -f 'cloudflared.*tunnel' 2>/dev/null || true
     systemctl stop xray 2>/dev/null || true
+    systemctl stop hysteria-server.service 2>/dev/null || true
     ;;
   start)
     systemctl start xray 2>/dev/null || true
+    systemctl start hysteria-server.service 2>/dev/null || true
     ;;
   menu|*)
     echo "Pooyan Manager"
     echo "=============================="
-    echo "pooyan renew   - rebuild RackNerd stable links"
+    echo "pooyan renew   - rebuild RackNerd strong 5 links"
     echo "pooyan links   - show human-readable links"
     echo "pooyan import  - show clean v2rayN import links"
+    echo "pooyan test    - quick local listening/service test"
     echo "pooyan status  - show status"
     echo "pooyan logs    - show logs"
     ;;
@@ -200,15 +240,19 @@ EOF
 }
 
 open_firewall_port() {
-  local port="$1"
-  yellow "Opening TCP ${port} locally if firewall is active..."
-  if command -v ufw >/dev/null 2>&1; then ufw allow "${port}/tcp" >/dev/null 2>&1 || true; fi
+  local port="$1" proto="${2:-tcp}"
+  yellow "Opening ${proto^^} ${port} locally if firewall is active..."
+  if command -v ufw >/dev/null 2>&1; then ufw allow "${port}/${proto}" >/dev/null 2>&1 || true; fi
   if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
-    firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
+    firewall-cmd --permanent --add-port="${port}/${proto}" >/dev/null 2>&1 || true
     firewall-cmd --reload >/dev/null 2>&1 || true
   fi
   if command -v iptables >/dev/null 2>&1; then
-    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || true
+    if [ "$proto" = "udp" ]; then
+      iptables -C INPUT -p udp --dport "$port" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p udp --dport "$port" -j ACCEPT >/dev/null 2>&1 || true
+    else
+      iptables -C INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || true
+    fi
   fi
 }
 
@@ -258,6 +302,67 @@ start_xray() {
   fi
 }
 
+write_hysteria_config() {
+  local password="$1" obfs_password="$2"
+  mkdir -p /etc/hysteria
+  if [ ! -s "$HYSTERIA_CERT" ] || [ ! -s "$HYSTERIA_KEY" ]; then
+    cyan "Generating self-signed TLS certificate for Hysteria2..."
+    openssl req -x509 -newkey rsa:2048 -nodes \
+      -keyout "$HYSTERIA_KEY" \
+      -out "$HYSTERIA_CERT" \
+      -days 3650 \
+      -subj "/CN=${HYSTERIA_SNI}" \
+      -addext "subjectAltName=DNS:${HYSTERIA_SNI}" >/dev/null 2>&1 || {
+        red "Failed to generate Hysteria2 certificate."
+        return 1
+      }
+    chmod 644 "$HYSTERIA_CERT" || true
+    chmod 600 "$HYSTERIA_KEY" || true
+  fi
+  cat > "$HYSTERIA_CONFIG" <<YAML
+listen: :${HYSTERIA_PORT}
+
+tls:
+  cert: ${HYSTERIA_CERT}
+  key: ${HYSTERIA_KEY}
+  sniGuard: disable
+
+auth:
+  type: password
+  password: ${password}
+
+obfs:
+  type: salamander
+  salamander:
+    password: ${obfs_password}
+
+quic:
+  initStreamReceiveWindow: 8388608
+  maxStreamReceiveWindow: 8388608
+  initConnReceiveWindow: 20971520
+  maxConnReceiveWindow: 20971520
+  maxIdleTimeout: 30s
+  maxIncomingStreams: 1024
+  disablePathMTUDiscovery: false
+
+masquerade:
+  type: proxy
+  proxy:
+    url: https://${HYSTERIA_SNI}/
+    rewriteHost: true
+YAML
+}
+
+start_hysteria2() {
+  if ! command -v systemctl >/dev/null 2>&1; then return 1; fi
+  systemctl enable hysteria-server.service >/dev/null 2>&1 || true
+  systemctl restart hysteria-server.service >/dev/null 2>&1 || {
+    yellow "Hysteria2 service did not start. Check: journalctl -u hysteria-server.service -n 80 --no-pager"
+    return 1
+  }
+  return 0
+}
+
 stop_old_cloudflared() {
   if [ -f "$ARGO_PID" ]; then kill "$(cat "$ARGO_PID")" >/dev/null 2>&1 || true; rm -f "$ARGO_PID"; fi
   pkill -f 'cloudflared.*tunnel.*--url' >/dev/null 2>&1 || true
@@ -289,8 +394,7 @@ get_trycloudflare_host() {
     for i in $(seq 1 90); do
       host="$(extract_try_host || true)"
       if printf '%s' "$host" | grep -Eq '^[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com$'; then
-        printf '%s
-' "$host"
+        printf '%s\n' "$host"
         return 0
       fi
       if ! kill -0 "$(cat "$ARGO_PID" 2>/dev/null)" >/dev/null 2>&1; then break; fi
@@ -319,25 +423,33 @@ vless_ws_link() {
   fi
 }
 
+hysteria2_link() {
+  local ip="$1" password="$2" obfs_password="$3" remark="$4"
+  printf 'hysteria2://%s@%s:%s/?insecure=1&sni=%s&obfs=salamander&obfs-password=%s#%s\n' \
+    "$password" "$ip" "$HYSTERIA_PORT" "$HYSTERIA_SNI" "$obfs_password" "$(url_label "$remark")"
+}
+
 write_links() {
-  local uuid="$1" ip="$2" local_port="$3" path="$4" try_host="${5:-}"
+  local uuid="$1" ip="$2" local_port="$3" path="$4" try_host="${5:-}" hy2_password="${6:-}" hy2_obfs="${7:-}" hy2_ok="${8:-0}"
   mkdir -p "$APP_DIR"
   : > "$IMPORT_FILE"
   : > "$LINK_FILE"
 
   {
-    echo "Pooyan ${PROJECT_VERSION} - RackNerd 3 Links Clean"
+    echo "Pooyan ${PROJECT_VERSION} - RackNerd Strong 5 Links"
     echo "VPS IP: ${ip}"
     echo "Local VLESS WS port: ${local_port}"
     echo "UUID: ${uuid}"
     echo "WS path: /${path}"
     echo "Cloudflare front address: ${CF_FRONT_DOMAIN}"
     if [ -n "$try_host" ]; then echo "TryCloudflare host: ${try_host}"; else echo "TryCloudflare host: FAILED"; fi
+    if [ "$hy2_ok" = "1" ]; then echo "Hysteria2 UDP: ${ip}:${HYSTERIA_PORT}"; else echo "Hysteria2 UDP: SKIPPED/FAILED"; fi
     echo
-    echo "Only these 3 RackNerd-friendly links are generated:"
-    echo "1) CF-443 old-style China link"
-    echo "2) CF-80 old-style China link"
-    echo "3) DIRECT-IP backup/test"
+    echo "Only RackNerd-friendly links are generated:"
+    echo "1) CF-443 main"
+    echo "2) CF-80 backup"
+    echo "3) HY2-443 UDP speed test"
+    echo "4) DIRECT-IP emergency/test"
     echo
     echo "Clean v2rayN import file: ${IMPORT_FILE}"
     echo "Do NOT paste VLESS links into Linux/PuTTY command line. Use the import file."
@@ -346,8 +458,14 @@ write_links() {
   } >> "$LINK_FILE"
 
   if printf '%s' "$try_host" | grep -Eq '^[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com$'; then
+    # Same connection style as the user's fastest link: direct trycloudflare host + TLS 443.
+    vless_ws_link "$try_host" 443 tls "$try_host" "$path" "$uuid" "Pooyan-TRY-TLS-443" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
     vless_ws_link "$CF_FRONT_DOMAIN" 443 tls "$try_host" "$path" "$uuid" "Pooyan-RN-CF-443" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
     vless_ws_link "$CF_FRONT_DOMAIN" 80 none "$try_host" "$path" "$uuid" "Pooyan-RN-CF-80" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
+  fi
+
+  if [ "$hy2_ok" = "1" ] && [ -n "$hy2_password" ] && [ -n "$hy2_obfs" ]; then
+    hysteria2_link "$ip" "$hy2_password" "$hy2_obfs" "Pooyan-RN-HY2-443" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
   fi
 
   vless_ws_link "$ip" "$local_port" none "" "$path" "$uuid" "Pooyan-RN-DIRECT-IP-${local_port}" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
@@ -361,7 +479,7 @@ write_links() {
 }
 
 save_state() {
-  local uuid="$1" ip="$2" port="$3" path="$4" try_host="${5:-}"
+  local uuid="$1" ip="$2" port="$3" path="$4" try_host="${5:-}" hy2_password="${6:-}" hy2_obfs="${7:-}" hy2_ok="${8:-0}"
   mkdir -p "$APP_DIR"
   cat > "$STATE_FILE" <<EOF
 PROJECT_VERSION='${PROJECT_VERSION}'
@@ -371,21 +489,27 @@ LOCAL_PORT='${port}'
 WS_PATH='${path}'
 TRY_HOST='${try_host}'
 CF_FRONT_DOMAIN='${CF_FRONT_DOMAIN}'
+HYSTERIA_PORT='${HYSTERIA_PORT}'
+HYSTERIA_SNI='${HYSTERIA_SNI}'
+HYSTERIA_PASSWORD='${hy2_password}'
+HYSTERIA_OBFS='${hy2_obfs}'
+HYSTERIA_OK='${hy2_ok}'
 EOF
+  chmod 600 "$STATE_FILE" 2>/dev/null || true
 }
 
-install_racknerd_stable() {
+install_racknerd_strong() {
   banner
-  cyan "RackNerd Stable Mode: only old good China links + Direct IP backup"
-  echo "This mode generates only 3 links: CF-443, CF-80, DIRECT-IP."
+  cyan "RackNerd Strong Mode: TRY-TLS-443 + CF-443 + CF-80 + HY2-443 + Direct IP"
+  echo "This mode stays clean: maximum 5 links."
   echo
 
-  local uuid path port ip try_host
+  local uuid path port ip try_host hy2_password hy2_obfs hy2_ok
   install_pkgs
   install_xray
   install_cloudflared
   install_self_manager
-  enable_bbr
+  enable_network_tuning
 
   uuid="$(random_uuid)"
   path="$(random_path)"
@@ -394,23 +518,38 @@ install_racknerd_stable() {
   [ -n "$ip" ] || ip="YOUR_SERVER_IP"
 
   write_xray_config "$uuid" "$port" "$path"
-  open_firewall_port "$port"
+  open_firewall_port "$port" tcp
   start_xray
   sleep 2
+
+  hy2_ok="0"
+  hy2_password="$(random_secret)"
+  hy2_obfs="$(random_secret)"
+  if install_hysteria2; then
+    if write_hysteria_config "$hy2_password" "$hy2_obfs"; then
+      open_firewall_port "$HYSTERIA_PORT" udp
+      if start_hysteria2; then
+        hy2_ok="1"
+        green "Hysteria2 ready on UDP ${HYSTERIA_PORT}."
+      fi
+    fi
+  fi
 
   try_host=""
   if try_host="$(get_trycloudflare_host "$port")" && [ -n "$try_host" ]; then
     green "TryCloudflare created: ${try_host}"
   else
-    red "Could not get trycloudflare.com URL. Direct IP link will still be generated."
+    red "Could not get trycloudflare.com URL. Direct IP/HY2 links will still be generated."
     yellow "Check log: cat ${ARGO_LOG}"
     try_host=""
   fi
 
-  write_links "$uuid" "$ip" "$port" "$path" "$try_host"
-  save_state "$uuid" "$ip" "$port" "$path" "$try_host"
+  write_links "$uuid" "$ip" "$port" "$path" "$try_host" "$hy2_password" "$hy2_obfs" "$hy2_ok"
+  save_state "$uuid" "$ip" "$port" "$path" "$try_host" "$hy2_password" "$hy2_obfs" "$hy2_ok"
 
   green "Done. / آماده شد."
+  echo
+  yellow "Important: for HY2, RackNerd/firewall panel must allow UDP ${HYSTERIA_PORT}."
   echo
   cyan "Use this for v2rayN import:"
   echo "cat ${IMPORT_FILE}"
@@ -424,21 +563,23 @@ show_links() {
 
 main_menu() {
   banner
-  echo "1) Build RackNerd stable links only  (recommended)"
+  echo "1) Build RackNerd strong 5 links only  (recommended)"
   echo "2) Show links"
   echo "3) Show v2rayN import links"
-  echo "4) Status"
-  echo "5) Logs"
+  echo "4) Test local services"
+  echo "5) Status"
+  echo "6) Logs"
   echo "0) Exit"
   echo
   read -r -p "Select [1]: " c || true
   c="${c:-1}"
   case "$c" in
-    1) install_racknerd_stable ;;
+    1) install_racknerd_strong ;;
     2) show_links ;;
     3) [ -f "$IMPORT_FILE" ] && cat "$IMPORT_FILE" || red "No import file." ;;
-    4) "$APP_CMD" status 2>/dev/null || true ;;
-    5) "$APP_CMD" logs 2>/dev/null || true ;;
+    4) "$APP_CMD" test 2>/dev/null || true ;;
+    5) "$APP_CMD" status 2>/dev/null || true ;;
+    6) "$APP_CMD" logs 2>/dev/null || true ;;
     0) exit 0 ;;
     *) red "Invalid choice"; exit 1 ;;
   esac
@@ -446,7 +587,7 @@ main_menu() {
 
 need_root
 if [ "${1:-}" = "install" ] || [ "${1:-}" = "racknerd" ]; then
-  install_racknerd_stable
+  install_racknerd_strong
 else
   main_menu
 fi

@@ -11,4 +11,4 @@ Keep:
 
 - `LICENSE`
 
-Delete old versioned files if any exist in the repository root.
+Delete old versioned files from the repo root so the page stays clean.
