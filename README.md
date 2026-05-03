@@ -1,18 +1,23 @@
-# Pooyan 0.14 - RackNerd Stable Only
+# Pooyan 0.15 - RackNerd 3 Links Clean
 
-This version is intentionally small and clean for RackNerd VPS use.
+Clean RackNerd-focused installer for China testing.
 
-## What it builds
+## What this version generates
 
-Only 5 links maximum:
+Only 3 client links:
 
-1. `Pooyan-RN-CF-443` - old-style China Cloudflare front link
-2. `Pooyan-RN-CF-80` - old-style China Cloudflare front link
-3. `Pooyan-RN-TRY-443` - direct trycloudflare link
-4. `Pooyan-RN-TRY-80` - direct trycloudflare link
-5. `Pooyan-RN-DIRECT-IP` - Direct IP backup/test link
+1. `Pooyan-RN-CF-443` - Cloudflare front address on TLS 443
+2. `Pooyan-RN-CF-80` - Cloudflare front address on HTTP 80
+3. `Pooyan-RN-DIRECT-IP-PORT` - direct VPS IP backup/test link
 
-No 2053/2083/2087/2096/8443 links are generated in this RackNerd-only version, to avoid clutter and handshake-test noise.
+This version removes the duplicate direct `trycloudflare.com` links to avoid clutter.
+
+## Fixed in 0.15
+
+- Fixed broken link generation where cloudflared status text was accidentally captured inside the VLESS host/SNI.
+- `get_trycloudflare_host` now prints progress messages to stderr, not stdout.
+- Host validation now accepts only a clean `*.trycloudflare.com` hostname.
+- v2rayN import file stays clean.
 
 ## Install
 
@@ -20,30 +25,21 @@ No 2053/2083/2087/2096/8443 links are generated in this RackNerd-only version, t
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-Choose option `1`.
-
-## v2rayN import
-
-Use this file only:
+After installation, import links from:
 
 ```bash
 cat /root/pooyan-v2rayn-import.txt
 ```
 
-Do not paste VLESS links into the Linux/PuTTY command line, because `&` breaks the link.
+Do not paste VLESS links into the Linux shell because `&` can break the link.
 
 ## Manager
 
 ```bash
-pooyan renew
+pooyan
 pooyan links
 pooyan import
+pooyan renew
 pooyan status
 pooyan logs
 ```
-
-## Files
-
-- Human-readable links: `/root/v2ray.txt`
-- Clean v2rayN import: `/root/pooyan-v2rayn-import.txt`
-- Base64 subscription: `/root/pooyan-sub.txt`

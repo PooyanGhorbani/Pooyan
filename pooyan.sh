@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.14"
-APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION} - RackNerd Stable Only"
+PROJECT_VERSION="0.15"
+APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION} - RackNerd 3 Links Clean"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
 RAW_URL="https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh"
@@ -283,17 +283,21 @@ extract_try_host() {
 get_trycloudflare_host() {
   local port="$1" mode i host
   for mode in http2-v4 http2-auto quic-v4 default; do
-    yellow "Trying cloudflared quick tunnel mode: ${mode}"
+    yellow "Trying cloudflared quick tunnel mode: ${mode}" >&2
     start_cloudflared_mode "$port" "$mode"
     host=""
     for i in $(seq 1 90); do
       host="$(extract_try_host || true)"
-      if [ -n "$host" ]; then echo "$host"; return 0; fi
+      if printf '%s' "$host" | grep -Eq '^[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com$'; then
+        printf '%s
+' "$host"
+        return 0
+      fi
       if ! kill -0 "$(cat "$ARGO_PID" 2>/dev/null)" >/dev/null 2>&1; then break; fi
       sleep 1
     done
-    yellow "No URL from ${mode}. Last log:"
-    tail -n 12 "$ARGO_LOG" 2>/dev/null || true
+    yellow "No URL from ${mode}. Last log:" >&2
+    tail -n 12 "$ARGO_LOG" 2>/dev/null >&2 || true
   done
   return 1
 }
@@ -322,7 +326,7 @@ write_links() {
   : > "$LINK_FILE"
 
   {
-    echo "Pooyan ${PROJECT_VERSION} - RackNerd Stable Only"
+    echo "Pooyan ${PROJECT_VERSION} - RackNerd 3 Links Clean"
     echo "VPS IP: ${ip}"
     echo "Local VLESS WS port: ${local_port}"
     echo "UUID: ${uuid}"
@@ -330,12 +334,10 @@ write_links() {
     echo "Cloudflare front address: ${CF_FRONT_DOMAIN}"
     if [ -n "$try_host" ]; then echo "TryCloudflare host: ${try_host}"; else echo "TryCloudflare host: FAILED"; fi
     echo
-    echo "Only these RackNerd-friendly links are generated:"
+    echo "Only these 3 RackNerd-friendly links are generated:"
     echo "1) CF-443 old-style China link"
     echo "2) CF-80 old-style China link"
-    echo "3) TRY-443 direct trycloudflare link"
-    echo "4) TRY-80 direct trycloudflare link"
-    echo "5) DIRECT-IP backup/test"
+    echo "3) DIRECT-IP backup/test"
     echo
     echo "Clean v2rayN import file: ${IMPORT_FILE}"
     echo "Do NOT paste VLESS links into Linux/PuTTY command line. Use the import file."
@@ -343,11 +345,9 @@ write_links() {
     echo "Links:"
   } >> "$LINK_FILE"
 
-  if [ -n "$try_host" ]; then
+  if printf '%s' "$try_host" | grep -Eq '^[-a-zA-Z0-9]+(\.[-a-zA-Z0-9]+)*\.trycloudflare\.com$'; then
     vless_ws_link "$CF_FRONT_DOMAIN" 443 tls "$try_host" "$path" "$uuid" "Pooyan-RN-CF-443" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
     vless_ws_link "$CF_FRONT_DOMAIN" 80 none "$try_host" "$path" "$uuid" "Pooyan-RN-CF-80" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
-    vless_ws_link "$try_host" 443 tls "$try_host" "$path" "$uuid" "Pooyan-RN-TRY-443" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
-    vless_ws_link "$try_host" 80 none "$try_host" "$path" "$uuid" "Pooyan-RN-TRY-80" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
   fi
 
   vless_ws_link "$ip" "$local_port" none "" "$path" "$uuid" "Pooyan-RN-DIRECT-IP-${local_port}" | tee -a "$IMPORT_FILE" >> "$LINK_FILE"
@@ -377,7 +377,7 @@ EOF
 install_racknerd_stable() {
   banner
   cyan "RackNerd Stable Mode: only old good China links + Direct IP backup"
-  echo "This mode generates only: CF-443, CF-80, TRY-443, TRY-80, DIRECT-IP."
+  echo "This mode generates only 3 links: CF-443, CF-80, DIRECT-IP."
   echo
 
   local uuid path port ip try_host

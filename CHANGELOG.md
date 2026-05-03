@@ -1,20 +1,14 @@
 # Changelog
 
+## 0.15 - RackNerd 3 Links Clean
+
+- Fixed a critical parsing bug where cloudflared progress text such as `Trying cloudflared quick tunnel mode: http2-v4` could be inserted into VLESS host/SNI.
+- Reduced RackNerd output to only 3 practical links: CF-443, CF-80, and Direct IP.
+- Removed duplicate TRY-443 and TRY-80 links to keep v2rayN clean.
+- Added strict validation for `*.trycloudflare.com` host extraction.
+- Kept Direct IP as backup/test link.
+
 ## 0.14 - RackNerd Stable Only
 
-- Rebuilt quick mode specifically for RackNerd.
-- Removed noisy extra ports from the quick output.
-- Keeps only the connections that were useful in the user's RackNerd/v2rayN tests:
-  - CF old-style 443
-  - CF old-style 80
-  - trycloudflare 443
-  - trycloudflare 80
-  - Direct IP backup/test
-- Added stronger trycloudflare creation retry logic: http2 IPv4, http2 auto, quic IPv4, default.
-- Always creates `/root/pooyan-v2rayn-import.txt` for clean v2rayN import.
-- Keeps `pooyan` manager command working.
-
-## 0.13 - China Stable Restore
-
-- Restored old VLESS + WS + trycloudflare style.
-- Added Direct IP fallback.
+- RackNerd-focused Cloudflare WS output.
+- Generated CF and TRY variants plus Direct IP.
