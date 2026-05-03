@@ -1,0 +1,19 @@
+# Local PC commands after downloading pooyan_0.07.sh
+
+# 1) Rename it to pooyan.sh
+mv pooyan_0.07.sh pooyan.sh
+
+# 2) Test syntax locally if you have bash
+bash -n pooyan.sh
+
+# 3) Commit to your repo
+git clone https://github.com/PooyanGhorbani/Pooyan.git
+cd Pooyan
+cp ../pooyan.sh ./pooyan.sh
+cp ../README_Pooyan_0.07.md ./README.md
+git add pooyan.sh README.md
+git commit -m "Release Pooyan 0.07 China Recommended Edition"
+git push origin main
+
+# 4) Install on VPS
+bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
