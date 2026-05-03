@@ -1,25 +1,25 @@
-# Changelog — Pooyan 0.07
+# Changelog
 
-## Added
+## 0.08
 
-- Added China Recommended mode: VLESS + WebSocket + Cloudflare Tunnel + systemd service.
-- Added Advanced Reality/Vision mode for direct high-quality VPS routes.
-- Added automatic BBR sysctl configuration.
-- Added generation of multiple Cloudflare-compatible ports:
-  - HTTPS: 443, 2053, 2083, 2087, 2096, 8443
-  - HTTP: 80, 8080, 8880, 2052, 2082, 2086, 2095
-- Added CF Preferred IP style links using `cloudflare.182682.xyz` as a replaceable address placeholder.
-- Added `pooyan` manager command for status, restart, logs, links, and uninstall.
-- Added temporary Quick Tunnel mode for testing.
+Emergency fix for default installation behavior.
 
-## Changed
+### Fixed
 
-- Version bumped from 0.06 to 0.07.
-- VLESS is now the main/default protocol path for China-focused deployment.
-- Install Service is now the recommended path instead of Quick Mode.
+- Restored the old default behavior: the script no longer asks for a domain by default.
+- Option 1 now uses automatic `trycloudflare.com` address generation.
+- Custom Cloudflare domain setup moved to option 2.
+- Menu text now clearly says which mode needs a domain and which mode does not.
 
-## Notes
+### Changed
 
-- Keep `/root/.cloudflared` if you want to preserve Cloudflare authorization.
-- Quick mode is only for testing and will not survive reboot.
-- Reality/Vision mode is best tested only on VPS routes with good direct China connectivity.
+- Version bumped from 0.07 to 0.08.
+- README updated to explain Auto Domain vs Custom Domain.
+
+## 0.07
+
+- Added China Recommended mode.
+- Added Cloudflare custom domain tunnel mode.
+- Added multi-port VLESS WS links.
+- Added REALITY/Vision mode.
+- Added BBR helper.

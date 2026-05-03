@@ -1,27 +1,15 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-# Run this from a folder that contains the clean files:
-# pooyan.sh README.md CHANGELOG.md VERSION
+# Run this from your local clone of PooyanGhorbani/Pooyan
+cp /path/to/pooyan.sh ./pooyan.sh
+cp /path/to/README.md ./README.md
+cp /path/to/CHANGELOG.md ./CHANGELOG.md
+cp /path/to/VERSION ./VERSION
 
-git clone https://github.com/PooyanGhorbani/Pooyan.git
-cd Pooyan
+rm -f pooyan_0.07.sh README_Pooyan_0.07.md CHANGELOG_Pooyan_0.07.md upload_commands_pooyan_0.07.txt
 
-cp ../pooyan.sh ./pooyan.sh
-cp ../README.md ./README.md
-cp ../CHANGELOG.md ./CHANGELOG.md
-cp ../VERSION ./VERSION
-chmod +x ./pooyan.sh
-
-# Remove old versioned files from repo root.
-rm -f pooyan_0.07.sh \
-      README_Pooyan_0.07.md \
-      CHANGELOG_Pooyan_0.07.md \
-      upload_commands_pooyan_0.07.txt
-
-git add -A
-git commit -m "Release Pooyan 0.07 with clean GitHub file names"
-git push origin main
-
-# Quick remote syntax test on any Linux/VPS:
-# bash -n <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
+git add pooyan.sh README.md CHANGELOG.md VERSION
+git rm -f pooyan_0.07.sh README_Pooyan_0.07.md CHANGELOG_Pooyan_0.07.md upload_commands_pooyan_0.07.txt 2>/dev/null || true
+git commit -m "Fix default auto-domain install behavior for Pooyan 0.08"
+git push

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.07"
+PROJECT_VERSION="0.08"
 APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
@@ -34,7 +34,7 @@ banner(){
   clear || true
   line
   printf "%28s\n" "${APP_TITLE}"
-  printf "%38s\n" "China Recommended Edition"
+  printf "%38s\n" "Auto Domain China Edition"
   line
   echo
 }
@@ -292,7 +292,7 @@ write_ws_links(){
   mkdir -p "$APP_DIR"
   : > "$LINK_FILE"
   {
-    echo "Pooyan ${PROJECT_VERSION} - VLESS WS Cloudflare / China Recommended"
+    echo "Pooyan ${PROJECT_VERSION} - VLESS WS Cloudflare / Auto Domain"
     echo "UUID: ${uuid}"
     echo "Host/SNI: ${domain}"
     echo "WS Path: /${path}"
@@ -332,10 +332,10 @@ make_tunnel_name(){
 
 setup_vless_cloudflare_service(){
   banner
-  blue "China Recommended: VLESS + WS + Cloudflare Tunnel + service + BBR"
+  blue "Custom Domain Mode: VLESS + WS + Cloudflare Tunnel + service + BBR"
   echo
   local domain uuid path port tunnel_name tunnel_id label
-  domain="$(ask_default "Full Cloudflare subdomain / کامل دامنه" "vpn.example.com")"
+  domain="$(ask_default "Full Cloudflare subdomain / دامنه کامل Cloudflare" "vpn.example.com")"
   if ! validate_domain "$domain"; then
     red "Invalid domain: $domain"
     exit 1
@@ -392,8 +392,9 @@ EOF_YAML
 
 quick_tunnel(){
   banner
-  blue "Quick test mode: VLESS + WS + trycloudflare.com"
-  yellow "This mode is for testing only. It will break after reboot or rerun."
+  blue "Auto Domain Mode: VLESS + WS + trycloudflare.com"
+  yellow "No Cloudflare account/domain is needed. The trycloudflare.com address is generated automatically."
+  yellow "Note: this automatic address can change after reboot/rerun. For a fixed address, use Custom Domain mode."
   echo
   local uuid path port argo n label
   uuid="$(random_uuid)"
@@ -620,23 +621,23 @@ show_links(){
 
 main_menu(){
   banner
-  echo "1) China Recommended - VLESS + Cloudflare Tunnel + service + BBR"
-  echo "2) Advanced - VLESS + REALITY + Vision direct"
-  echo "3) Quick Test - VLESS + trycloudflare.com temporary"
+  echo "1) Auto Domain - VLESS + trycloudflare.com  (NO domain needed / بدون دامنه)"
+  echo "2) Custom Domain - VLESS + Cloudflare Tunnel + service + BBR"
+  echo "3) Advanced - VLESS + REALITY + Vision direct"
   echo "4) Show current links"
   echo "5) Manager menu"
   echo "6) Uninstall"
   echo "0) Exit"
   echo
-  echo "建议中国用户：先选 1；高质量 CN2/CMI/AS9929 VPS 可选 2。"
-  echo "پیشنهاد برای چین: اول گزینه 1؛ اگر VPS مسیر خیلی خوب دارد گزینه 2."
+  echo "建议中国用户：先选 1，不需要域名；如果你有 Cloudflare 域名，再选 2。"
+  echo "پیشنهاد برای چین: اول گزینه 1؛ دامنه نمی‌خواهد. اگر دامنه Cloudflare داری، گزینه 2."
   echo
   read -r -p "Select [1]: " choice || true
   choice="${choice:-1}"
   case "$choice" in
-    1) setup_vless_cloudflare_service ;;
-    2) setup_reality_vision ;;
-    3) quick_tunnel ;;
+    1) quick_tunnel ;;
+    2) setup_vless_cloudflare_service ;;
+    3) setup_reality_vision ;;
     4) show_links ;;
     5) if [ -x "$APP_CMD" ]; then "$APP_CMD"; else red "Manager is not installed yet."; fi ;;
     6) uninstall_pooyan ;;
