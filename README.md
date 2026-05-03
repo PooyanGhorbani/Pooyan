@@ -1,28 +1,29 @@
-# Pooyan 0.10
+# Pooyan 0.11
 
-China-friendly Xray installer with three practical modes:
-
-1. **Quick Mode**: VLESS + WebSocket + automatic `trycloudflare.com` address, plus one **Direct IP link without domain** for speed testing.
-2. **Custom Domain Mode**: VLESS + WebSocket + Cloudflare Tunnel with your own fixed Cloudflare domain.
-3. **Advanced Mode**: VLESS + REALITY + Vision direct connection for good VPS routes such as CN2 / CMI / AS9929.
-
-## Install
+China-friendly Xray installer with three modes:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PooyanGhorbani/Pooyan/main/pooyan.sh)
 ```
 
-## Recommended for China
+## Modes
 
-Start with **Option 1 - Quick Mode**.
+1. **Quick Mode - Auto trycloudflare.com + Direct IP fallback**
+   - No domain needed
+   - No Cloudflare account needed
+   - Creates a Direct IP VLESS/WS link first
+   - Then tries to create a temporary `trycloudflare.com` link
+   - If Cloudflare quick tunnel fails, the Direct IP link is still saved
 
-It creates:
+2. **Custom Domain Mode - VLESS + WS + Cloudflare Tunnel**
+   - Needs your own Cloudflare domain
+   - Stable hostname
+   - Runs as systemd services
+   - Enables BBR when possible
 
-- Cloudflare automatic `trycloudflare.com` links
-- Cloudflare preferred-IP style links
-- One direct VPS IP link without domain
-
-The Direct IP link is only for quick speed testing. If it does not connect, open the generated TCP port in your VPS provider firewall/security group.
+3. **Advanced Mode - VLESS + REALITY + Vision**
+   - Direct VPS mode
+   - Recommended only for good China routes such as CN2 / CMI / AS9929
 
 ## Manager
 
@@ -32,8 +33,6 @@ After installation:
 pooyan
 ```
 
-## Files
-
 Links are saved here:
 
 ```text
@@ -41,9 +40,14 @@ Links are saved here:
 /root/v2ray.txt
 ```
 
-## Notes
+## Important notes
 
-- Quick Mode does not need a Cloudflare account or domain.
-- `trycloudflare.com` addresses can change after reboot or rerun.
-- For fixed addresses, use Custom Domain Mode.
-- For the best direct VPS route, test Advanced REALITY/Vision mode.
+- Quick `trycloudflare.com` addresses are temporary and can change after rerun/reboot.
+- Direct IP links need the TCP port open in the VPS firewall/security group.
+- For China, test several Cloudflare ports and keep the fastest stable one.
+- If Quick Mode cannot get a trycloudflare URL, check:
+
+```bash
+cat /tmp/pooyan-argo.log
+cat /tmp/pooyan-xray.log
+```

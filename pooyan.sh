@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="Pooyan"
-PROJECT_VERSION="0.10"
+PROJECT_VERSION="0.11"
 APP_TITLE="${PROJECT_NAME} ${PROJECT_VERSION}"
 APP_DIR="/opt/pooyan"
 APP_CMD="/usr/bin/pooyan"
@@ -34,7 +34,7 @@ banner(){
   clear || true
   line
   printf "%28s\n" "${APP_TITLE}"
-  printf "%38s\n" "Auto Domain + Direct IP Edition"
+  printf "%38s\n" "Auto Domain + Direct IP Fallback Edition"
   line
   echo
 }
@@ -360,6 +360,61 @@ append_direct_ip_links(){
   cp -f "$LINK_FILE" "$ROOT_LINK_FILE" 2>/dev/null || true
 }
 
+write_direct_only_links(){
+  local uuid="$1" server_ip="$2" port="$3" path="$4" label_prefix="$5"
+  mkdir -p "$APP_DIR"
+  : > "$LINK_FILE"
+  {
+    echo "Pooyan ${PROJECT_VERSION} - Direct IP Quick Link"
+    echo "UUID: ${uuid}"
+    echo "Server IP: ${server_ip}"
+    echo "Port: ${port}"
+    echo "WS Path: /${path}"
+  } >> "$LINK_FILE"
+  append_direct_ip_links "$uuid" "$server_ip" "$port" "$path" "$label_prefix"
+}
+
+extract_trycloudflare_url(){
+  grep -oE 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' /tmp/pooyan-argo.log 2>/dev/null | head -n1 | sed 's#https://##' || true
+}
+
+start_quick_cloudflared_once(){
+  local port="$1" mode="$2"
+  : > /tmp/pooyan-argo.log
+  case "$mode" in
+    default)
+      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate >/tmp/pooyan-argo.log 2>&1 &
+      ;;
+    http2)
+      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate --protocol http2 >/tmp/pooyan-argo.log 2>&1 &
+      ;;
+    quic)
+      nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate --protocol quic >/tmp/pooyan-argo.log 2>&1 &
+      ;;
+  esac
+}
+
+get_trycloudflare_with_retries(){
+  local port="$1" mode n argo
+  for mode in default http2 quic; do
+    yellow "Starting cloudflared quick tunnel (${mode})..." >&2
+    pkill -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1 || true
+    start_quick_cloudflared_once "$port" "$mode"
+    argo=""
+    for n in $(seq 1 60); do
+      argo="$(extract_trycloudflare_url)"
+      [ -n "$argo" ] && { echo "$argo"; return 0; }
+      if ! pgrep -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+    yellow "No trycloudflare URL from mode: ${mode}. Last cloudflared log:" >&2
+    tail -n 12 /tmp/pooyan-argo.log >&2 2>/dev/null || true
+  done
+  return 1
+}
+
 cloudflared_login_if_needed(){
   mkdir -p /root/.cloudflared
   if ls /root/.cloudflared/cert.pem >/dev/null 2>&1; then
@@ -440,7 +495,7 @@ quick_tunnel(){
   yellow "No Cloudflare account/domain is needed. The trycloudflare.com address is generated automatically."
   yellow "Note: this automatic address can change after reboot/rerun. For a fixed address, use Custom Domain mode."
   echo
-  local uuid path port argo n label
+  local uuid path port argo label server_ip
   uuid="$(random_uuid)"
   path="$(random_path)"
   port="$(random_port)"
@@ -455,26 +510,31 @@ quick_tunnel(){
   stop_disable_service cloudflared
   stop_disable_service xray
   pkill -f "${XRAY_BIN}" >/dev/null 2>&1 || true
-  pkill -f "${CLOUDFLARED_BIN}" >/dev/null 2>&1 || true
+  pkill -f "${CLOUDFLARED_BIN}.*tunnel" >/dev/null 2>&1 || true
+
   nohup "$XRAY_BIN" run -config "${APP_DIR}/config.json" >/tmp/pooyan-xray.log 2>&1 &
-  nohup "$CLOUDFLARED_BIN" tunnel --url "http://127.0.0.1:${port}" --no-autoupdate --edge-ip-version 4 --protocol http2 >/tmp/pooyan-argo.log 2>&1 &
+  sleep 2
+
+  server_ip="$(public_ip | tr -d '\n' | tr -d ' ')"
+  write_direct_only_links "$uuid" "$server_ip" "$port" "$path" "$label"
+  green "Direct IP quick link generated first: ${server_ip}:${port}"
 
   argo=""
-  for n in $(seq 1 30); do
-    argo="$(grep -oE 'https://[-a-zA-Z0-9.]+\.trycloudflare\.com' /tmp/pooyan-argo.log 2>/dev/null | head -n1 | sed 's#https://##' || true)"
-    [ -n "$argo" ] && break
-    sleep 1
-  done
-  if [ -z "$argo" ]; then
-    red "Could not get trycloudflare.com URL. Check /tmp/pooyan-argo.log"
-    exit 1
+  if argo="$(get_trycloudflare_with_retries "$port")" && [ -n "$argo" ]; then
+    write_ws_links "$uuid" "$argo" "$path" "$label"
+    append_direct_ip_links "$uuid" "$server_ip" "$port" "$path" "$label"
+    green "Quick tunnel created: ${argo}"
+    green "Direct IP test link was also generated: ${server_ip}:${port}"
+    cat "$LINK_FILE"
+  else
+    red "Could not get trycloudflare.com URL after several attempts."
+    yellow "But the Direct IP link was created and saved to: ${LINK_FILE} and ${ROOT_LINK_FILE}"
+    yellow "Check the cloudflared log with: cat /tmp/pooyan-argo.log"
+    yellow "If the log shows network/connection errors, try again later or use Custom Domain / Reality mode."
+    echo
+    cat "$LINK_FILE"
+    exit 0
   fi
-  write_ws_links "$uuid" "$argo" "$path" "$label"
-  server_ip="$(public_ip | tr -d '\n' | tr -d ' ')"
-  append_direct_ip_links "$uuid" "$server_ip" "$port" "$path" "$label"
-  green "Quick tunnel created: ${argo}"
-  green "Direct IP test link was also generated: ${server_ip}:${port}"
-  cat "$LINK_FILE"
 }
 
 reality_keys(){
@@ -671,7 +731,7 @@ show_links(){
 
 main_menu(){
   banner
-  echo "1) Quick Mode - Auto trycloudflare.com + Direct IP link  (بدون دامنه اختیاری)"
+  echo "1) Quick Mode - Auto trycloudflare.com + Direct IP fallback  (بدون دامنه)"
   echo "2) Custom Domain - VLESS + Cloudflare Tunnel + service + BBR"
   echo "3) Advanced - VLESS + REALITY + Vision direct"
   echo "4) Show current links"
@@ -680,7 +740,7 @@ main_menu(){
   echo "0) Exit"
   echo
   echo "建议中国用户：先选 1，不需要域名；如果你有 Cloudflare 域名，再选 2。"
-  echo "پیشنهاد برای چین: اول گزینه 1؛ لینک trycloudflare می‌دهد و یک لینک Direct IP بدون دامنه هم برای تست سرعت می‌سازد."
+  echo "پیشنهاد برای چین: اول گزینه 1؛ اول لینک Direct IP بدون دامنه را می‌سازد؛ اگر Cloudflare جواب بدهد لینک trycloudflare هم اضافه می‌کند."
   echo
   read -r -p "Select [1]: " choice || true
   choice="${choice:-1}"

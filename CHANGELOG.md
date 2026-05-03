@@ -1,29 +1,26 @@
 # Changelog
 
+## 0.11
+
+- Fixed Quick Mode behavior when `trycloudflare.com` URL is not returned.
+- Direct IP link is now generated first and saved even if Cloudflare quick tunnel fails.
+- Quick Mode now tries multiple cloudflared launch modes: default, http2, and quic.
+- Increased wait time for Cloudflare quick tunnel URL detection.
+- Removed hard dependency on quick tunnel success for the no-domain test link.
+- Better error output with `/tmp/pooyan-argo.log` and `/tmp/pooyan-xray.log` hints.
+
 ## 0.10
 
-- Added a Direct IP link without domain in Quick Mode.
-- Quick Mode now generates both:
-  - automatic `trycloudflare.com` links
-  - direct VPS IP VLESS WS link for speed testing
-- Quick Mode Xray inbound now listens on `0.0.0.0` so the direct IP link can work.
-- Added best-effort firewall opening for the generated direct TCP port using `ufw`, `firewall-cmd`, or `iptables` when available.
-- Updated menu text and README for the new no-domain direct test link.
+- Added Direct IP no-domain link in Quick Mode.
 
 ## 0.09
 
-- Fixed Xray config test command for newer Xray-core versions.
-- Uses `xray run -test -config` with fallback to older `xray test -config`.
+- Fixed Xray config test command compatibility.
 
 ## 0.08
 
-- Restored Auto Domain mode using `trycloudflare.com`.
-- No Cloudflare account or domain is needed for Option 1.
+- Restored Auto Domain mode using `trycloudflare.com` without needing a domain.
 
 ## 0.07
 
-- Added China Recommended structure.
-- Added VLESS + WebSocket + Cloudflare Tunnel mode.
-- Added REALITY/Vision advanced mode.
-- Added BBR enabling.
-- Added multi-port Cloudflare link generation.
+- Added China Recommended layout, BBR, Cloudflare port lists, and Reality/Vision mode.
